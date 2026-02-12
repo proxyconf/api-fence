@@ -1,0 +1,326 @@
+# Edge Cases Test Specification
+#
+# This spec covers edge cases and special scenarios:
+# - Unicode characters in paths and parameters
+# - URL encoding
+# - Empty values
+# - Boundary conditions
+# - Special characters
+
+openapi: "3.0.3"
+info:
+  title: Edge Cases Test API
+  version: "1.0.0"
+  description: API spec for testing edge cases and special scenarios
+
+servers:
+  - url: /api/v1
+
+paths:
+  # Unicode in path parameters
+  /unicode/{name}:
+    get:
+      operationId: getUnicodePath
+      summary: Test unicode characters in path
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+              example:
+                name: "Jürgen"
+
+  # URL encoded values
+  /encoded:
+    get:
+      operationId: getEncoded
+      summary: Test URL-encoded query parameters
+      parameters:
+        - name: value
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: special
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Empty string values
+  /empty-value:
+    get:
+      operationId: getEmptyValue
+      summary: Test empty string handling
+      parameters:
+        - name: required_param
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 0  # Explicitly allow empty
+        - name: optional_param
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Boundary integer values
+  /boundaries:
+    get:
+      operationId: getBoundaries
+      summary: Test integer boundary conditions
+      parameters:
+        - name: int32_val
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: -2147483648
+            maximum: 2147483647
+        - name: positive_only
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 1000000
+        - name: percentage
+          in: query
+          required: false
+          schema:
+            type: number
+            minimum: 0
+            maximum: 100
+            multipleOf: 0.01
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Multiple content types
+  /multi-content:
+    post:
+      operationId: postMultiContent
+      summary: Endpoint accepting multiple content types
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenericData"
+          application/xml:
+            schema:
+              $ref: "#/components/schemas/GenericData"
+          text/plain:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Null handling
+  /nullable:
+    post:
+      operationId: postNullable
+      summary: Test nullable fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - required_field
+              properties:
+                required_field:
+                  type: string
+                nullable_field:
+                  type: string
+                  nullable: true
+                optional_field:
+                  type: string
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Special characters in values
+  /special-chars:
+    get:
+      operationId: getSpecialChars
+      summary: Test special characters
+      parameters:
+        - name: value
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Case sensitivity test
+  /CaseSensitive/{MixedCase}:
+    get:
+      operationId: getCaseSensitive
+      summary: Test case sensitivity
+      parameters:
+        - name: MixedCase
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Array with different formats
+  /arrays:
+    get:
+      operationId: getArrayFormats
+      summary: Test different array serialization formats
+      parameters:
+        - name: csv_array
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+        - name: multi_array
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Trailing slashes
+  /trailing-slash:
+    get:
+      operationId: getTrailingSlash
+      summary: Test trailing slash handling
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                path: "/trailing-slash"
+
+  # Additional properties
+  /additional-props:
+    post:
+      operationId: postAdditionalProps
+      summary: Test additional properties handling
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                known_field:
+                  type: string
+              additionalProperties: true
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /strict-props:
+    post:
+      operationId: postStrictProps
+      summary: Test strict additional properties handling
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                known_field:
+                  type: string
+              additionalProperties: false
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  schemas:
+    GenericData:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true

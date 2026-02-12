@@ -1,0 +1,225 @@
+openapi: 3.0.0
+info:
+  title: Header Validation Example
+  description: Example API demonstrating request and response header validation
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:10000
+    description: Local Envoy proxy
+
+paths:
+  /api/secure:
+    get:
+      summary: Secure endpoint with header validation
+      description: Demonstrates request header validation with various constraints
+      operationId: getSecure
+      parameters:
+        # Required header with pattern validation
+        - name: X-API-Key
+          in: header
+          description: API key with alphanumeric and dash characters only
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9-]+$'
+            minLength: 20
+            maxLength: 40
+        
+        # Optional UUID header
+        - name: X-Request-ID
+          in: header
+          description: Optional request ID for distributed tracing
+          required: false
+          schema:
+            type: string
+            format: uuid
+        
+        # Optional integer header with range
+        - name: X-Client-Version
+          in: header
+          description: Client API version
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+        
+        # Enum header
+        - name: X-Preferred-Language
+          in: header
+          description: Preferred response language
+          required: false
+          schema:
+            type: string
+            enum: ["en", "es", "fr", "de"]
+            default: "en"
+      
+      responses:
+        '200':
+          description: Success response with validated headers
+          headers:
+            # Required response header
+            X-Response-ID:
+              description: Response ID matching request ID if provided
+              required: true
+              schema:
+                type: string
+                format: uuid
+            
+            # Rate limiting headers
+            X-Rate-Limit-Limit:
+              description: Total requests allowed in current window
+              required: true
+              schema:
+                type: integer
+                minimum: 1
+            
+            X-Rate-Limit-Remaining:
+              description: Requests remaining in current window
+              required: true
+              schema:
+                type: integer
+                minimum: 0
+            
+            X-Rate-Limit-Reset:
+              description: Unix timestamp when rate limit resets
+              required: true
+              schema:
+                type: integer
+                minimum: 0
+            
+            # Optional server info
+            X-Server-Version:
+              description: API server version
+              required: false
+              schema:
+                type: string
+                pattern: '^\d+\.\d+\.\d+$'
+          
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+        
+        '400':
+          description: Bad request - header validation failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        
+        '401':
+          description: Unauthorized - missing or invalid API key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  
+  /api/content:
+    post:
+      summary: Content submission with content-type validation
+      description: Validates both standard and custom headers
+      operationId: postContent
+      parameters:
+        # Validate content-type header
+        - name: Content-Type
+          in: header
+          description: Must be application/json
+          required: true
+          schema:
+            type: string
+            enum: ["application/json"]
+        
+        # API key
+        - name: X-API-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9-]+$'
+            minLength: 20
+        
+        # Content checksum for integrity
+        - name: X-Content-SHA256
+          in: header
+          description: SHA-256 hash of request body
+          required: false
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{64}$'
+      
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                content:
+                  type: string
+                  minLength: 1
+              required:
+                - title
+                - content
+      
+      responses:
+        '201':
+          description: Content created successfully
+          headers:
+            Location:
+              description: URL of created resource
+              required: true
+              schema:
+                type: string
+                pattern: '^/api/content/[a-f0-9-]+$'
+            
+            X-Content-ID:
+              description: Unique ID of created content
+              required: true
+              schema:
+                type: string
+                format: uuid
+            
+            ETag:
+              description: Entity tag for caching
+              required: false
+              schema:
+                type: string
+          
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  title:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+        
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '415':
+          description: Unsupported media type

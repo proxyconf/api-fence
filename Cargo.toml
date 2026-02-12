@@ -1,0 +1,59 @@
+[package]
+name = "api_fence"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Your Name <your.email@example.com>"]
+
+[lib]
+name = "api_fence"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Envoy dynamic modules SDK - must match Envoy version
+envoy-proxy-dynamic-modules-rust-sdk = { git = "https://github.com/envoyproxy/envoy", rev = "c9cd0f5d4a70d68a8a1fbbc3f48cf1e028f33ad8" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# OpenAPI parsing and validation
+openapiv3 = "2.0"
+serde_yaml = "0.9"
+indexmap = "2.0"
+# JSON Schema validation
+jsonschema = "0.18"
+# Schema cache with TTL support
+moka = { version = "0.12", features = ["sync"] }
+# Media type parsing
+mime = "0.3"
+# URL path matching and parsing
+matchit = "0.8"
+regex = "1.10"
+urlencoding = "2.1"
+# Form data parsing
+multer = "3.1"
+futures = "0.3"
+form_urlencoded = "1.2"
+base64 = "0.22"
+bytes = "1.0"
+# XML parsing and serialization
+quick-xml = "0.36"
+serde-xml-rs = "0.6"
+# Fake data generation for mocking
+fake = { version = "2.9", features = ["derive", "chrono", "http", "uuid"] }
+# Error handling
+thiserror = "1.0"
+rand = "0.8"
+uuid = { version = "1.0", features = ["v4"] }
+chrono = "0.4"
+
+[dev-dependencies]
+# Integration testing dependencies
+tempfile = "3"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

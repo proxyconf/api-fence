@@ -1,0 +1,248 @@
+openapi: 3.0.3
+info:
+  title: Mock Example API
+  description: Example API demonstrating mock response generation with examples
+  version: 1.0.0
+
+paths:
+  /users:
+    get:
+      summary: List all users
+      operationId: listUsers
+      responses:
+        '200':
+          description: Successful response with user list
+          content:
+            application/json:
+              example:
+                users:
+                  - id: 1
+                    name: "John Doe"
+                    email: "john@example.com"
+                    role: "admin"
+                  - id: 2
+                    name: "Jane Smith"
+                    email: "jane@example.com"
+                    role: "user"
+                total: 2
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  total:
+                    type: integer
+
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      operationId: getUserById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              example:
+                id: 1
+                name: "John Doe"
+                email: "john@example.com"
+                role: "admin"
+                created_at: "2024-01-15T10:30:00Z"
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              example:
+                error: "User not found"
+                message: "No user exists with ID 999"
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Create new user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  enum: [admin, user, guest]
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              example:
+                id: 3
+                name: "New User"
+                email: "new@example.com"
+                role: "user"
+                created_at: "2024-02-09T15:45:00Z"
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              example:
+                error: "Validation failed"
+                message: "Email format is invalid"
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /products:
+    get:
+      summary: List products with multiple response options
+      operationId: listProducts
+      responses:
+        '200':
+          description: Full product list
+          content:
+            application/json:
+              example:
+                products:
+                  - id: 1
+                    name: "Laptop"
+                    price: 999.99
+                    category: "Electronics"
+                  - id: 2
+                    name: "Mouse"
+                    price: 29.99
+                    category: "Electronics"
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+        '206':
+          description: Partial content (paginated)
+          content:
+            application/json:
+              example:
+                products:
+                  - id: 1
+                    name: "Laptop"
+                    price: 999.99
+                page: 1
+                total_pages: 5
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  page:
+                    type: integer
+                  total_pages:
+                    type: integer
+
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              example:
+                status: "healthy"
+                timestamp: "2024-02-09T15:45:00Z"
+                version: "1.0.0"
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+
+  /stats:
+    get:
+      summary: Get statistics (schema-based generation, no examples)
+      operationId: getStats
+      responses:
+        '200':
+          description: Statistics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_users:
+                    type: integer
+                  total_products:
+                    type: integer
+                  avg_price:
+                    type: number
+                  last_updated:
+                    type: string
+                    format: date-time
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, user, guest]
+        created_at:
+          type: string
+          format: date-time
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+        category:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string

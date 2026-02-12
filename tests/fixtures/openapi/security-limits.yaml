@@ -1,0 +1,260 @@
+# Security Limits Test Specification
+#
+# This spec is designed to test security hardening features:
+# - JSON depth limiting
+# - Large payload handling
+# - Regex input limits
+# - Schema complexity limits
+
+openapi: "3.0.3"
+info:
+  title: Security Limits Test API
+  version: "1.0.0"
+  description: API spec for testing security hardening limits
+
+servers:
+  - url: /api/v1
+
+paths:
+  # Test for deep JSON nesting limits
+  /deep-json:
+    post:
+      operationId: postDeepJson
+      summary: Endpoint accepting potentially deep JSON
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeepNestedObject"
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted:
+                    type: boolean
+        "400":
+          description: Rejected due to depth limit
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  # Test for large body size limits
+  /large-body:
+    post:
+      operationId: postLargeBody
+      summary: Endpoint for testing body size limits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: string
+                  maxLength: 1048576  # 1MB max in schema
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+        "413":
+          description: Payload too large
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  # Test for regex pattern matching with large inputs
+  /regex-test/{value}:
+    get:
+      operationId: getRegexTest
+      summary: Test regex matching limits
+      parameters:
+        - name: value
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]+$"
+            maxLength: 1000
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+
+  # Test for long path handling
+  /long-path/{segment1}/{segment2}/{segment3}/{segment4}/{segment5}:
+    get:
+      operationId: getLongPath
+      summary: Endpoint with many path segments
+      parameters:
+        - name: segment1
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 100
+        - name: segment2
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 100
+        - name: segment3
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 100
+        - name: segment4
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 100
+        - name: segment5
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 100
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Test for header size limits
+  /header-test:
+    get:
+      operationId: getHeaderTest
+      summary: Test header size limits
+      parameters:
+        - name: X-Large-Header
+          in: header
+          required: false
+          schema:
+            type: string
+            maxLength: 8192
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Test for query string limits
+  /query-test:
+    get:
+      operationId: getQueryTest
+      summary: Test query string limits
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 8192
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 4096
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Test for error message sanitization
+  /internal-path:
+    get:
+      operationId: getInternalPath
+      summary: Test that internal paths aren't leaked in errors
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  schemas:
+    # Deeply nested schema (for testing depth limits)
+    DeepNestedObject:
+      type: object
+      properties:
+        level1:
+          type: object
+          properties:
+            level2:
+              type: object
+              properties:
+                level3:
+                  type: object
+                  properties:
+                    level4:
+                      type: object
+                      properties:
+                        level5:
+                          type: object
+                          properties:
+                            level6:
+                              type: object
+                              properties:
+                                level7:
+                                  type: object
+                                  properties:
+                                    level8:
+                                      type: object
+                                      properties:
+                                        level9:
+                                          type: object
+                                          properties:
+                                            level10:
+                                              type: object
+                                              properties:
+                                                value:
+                                                  type: string
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string

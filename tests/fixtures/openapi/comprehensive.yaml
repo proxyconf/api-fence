@@ -1,0 +1,545 @@
+# Comprehensive OpenAPI Test Specification
+#
+# This spec covers all validation types for integration testing:
+# - Path parameters (integer, string, enum, pattern, min/max length)
+# - Query parameters (required, optional, types, arrays)
+# - Header parameters (required, optional, case-insensitive, patterns)
+# - Request body validation (JSON schema, required fields, types)
+# - Response validation (schema, headers)
+
+openapi: "3.0.3"
+info:
+  title: Integration Test API
+  version: "1.0.0"
+  description: Comprehensive API spec for integration testing
+
+servers:
+  - url: /
+
+paths:
+  # ============== Path Parameter Tests ==============
+  /users/{userId}:
+    get:
+      operationId: getUserById
+      summary: Get user by integer ID
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              example:
+                id: 1
+                name: "John Doe"
+                email: "john@example.com"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /products/{sku}:
+    get:
+      operationId: getProductBySku
+      summary: Get product by SKU (pattern validated)
+      parameters:
+        - name: sku
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Z]{3}-[0-9]{4}$"
+            minLength: 8
+            maxLength: 8
+      responses:
+        "200":
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+              example:
+                sku: "ABC-1234"
+                name: "Widget"
+                price: 19.99
+
+  /categories/{category}:
+    get:
+      operationId: getByCategory
+      summary: Get items by category (enum)
+      parameters:
+        - name: category
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - electronics
+              - clothing
+              - home
+              - garden
+      responses:
+        "200":
+          description: Items in category
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /slugs/{slug}:
+    get:
+      operationId: getBySlug
+      summary: Get by URL slug with length constraints
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 50
+      responses:
+        "200":
+          description: Item found
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # ============== Query Parameter Tests ==============
+  /search:
+    get:
+      operationId: searchItems
+      summary: Search with various query params
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query (required)
+          schema:
+            type: string
+            minLength: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: active
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: ids
+          in: query
+          required: false
+          description: Array of IDs
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: false
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResults"
+              example:
+                total: 42
+                items:
+                  - id: 1
+                    name: "Result 1"
+
+  # ============== Header Validation Tests ==============
+  /protected:
+    get:
+      operationId: getProtected
+      summary: Endpoint requiring specific headers
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9]{32}$"
+        - name: X-Request-ID
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: X-Environment
+          in: header
+          required: false
+          schema:
+            type: string
+            enum:
+              - development
+              - staging
+              - production
+      responses:
+        "200":
+          description: Access granted
+          headers:
+            X-RateLimit-Remaining:
+              required: true
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  # ============== Body Validation Tests ==============
+  /users:
+    post:
+      operationId: createUser
+      summary: Create a new user (JSON body validation)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+            example:
+              name: "Jane Doe"
+              email: "jane@example.com"
+              age: 25
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /orders:
+    post:
+      operationId: createOrder
+      summary: Create order with nested objects and arrays
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /feedback:
+    post:
+      operationId: submitFeedback
+      summary: Submit feedback (form urlencoded)
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - rating
+                - message
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                message:
+                  type: string
+                  minLength: 10
+                  maxLength: 1000
+      responses:
+        "200":
+          description: Feedback received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /optional-body:
+    post:
+      operationId: optionalBody
+      summary: Endpoint where body is optional
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # ============== Mock Response Tests ==============
+  /mock/example:
+    get:
+      operationId: getMockExample
+      summary: Returns mock from inline example
+      responses:
+        "200":
+          description: Mock response with example
+          headers:
+            X-Mock-Response:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              example:
+                id: 999
+                name: "Mock User"
+                email: "mock@example.com"
+
+  /mock/schema:
+    get:
+      operationId: getMockSchema
+      summary: Returns mock generated from schema
+      responses:
+        "200":
+          description: Mock response from schema
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - timestamp
+                properties:
+                  id:
+                    type: integer
+                  timestamp:
+                    type: string
+                    format: date-time
+                  tags:
+                    type: array
+                    items:
+                      type: string
+
+components:
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        age:
+          type: integer
+          minimum: 0
+          maximum: 150
+
+    CreateUserRequest:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        age:
+          type: integer
+          minimum: 0
+          maximum: 150
+
+    Product:
+      type: object
+      required:
+        - sku
+        - name
+        - price
+      properties:
+        sku:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+          minimum: 0
+
+    SearchResults:
+      type: object
+      required:
+        - total
+        - items
+      properties:
+        total:
+          type: integer
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+
+    CreateOrderRequest:
+      type: object
+      required:
+        - customerId
+        - items
+      properties:
+        customerId:
+          type: integer
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        shippingAddress:
+          $ref: "#/components/schemas/Address"
+        notes:
+          type: string
+
+    OrderItem:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+
+    Address:
+      type: object
+      required:
+        - street
+        - city
+        - country
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+        postalCode:
+          type: string
+
+    Order:
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pending
+            - confirmed
+            - shipped
+            - delivered
+
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+              code:
+                type: string
+
+  responses:
+    BadRequest:
+      description: Bad request - validation failed
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+          example:
+            type: "https://api.example.com/errors/validation"
+            title: "Validation Error"
+            status: 400
+            detail: "Request validation failed"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+          example:
+            type: "https://api.example.com/errors/not-found"
+            title: "Not Found"
+            status: 404
+            detail: "The requested resource was not found"

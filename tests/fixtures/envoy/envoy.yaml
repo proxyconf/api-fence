@@ -1,0 +1,73 @@
+# Envoy Configuration Template for Integration Testing
+#
+# This is a sample configuration for local development.
+# In actual tests, config is generated dynamically by container.rs.
+#
+# Usage:
+#   docker-compose up
+#
+# This configuration:
+# - Listens on port 10000 for HTTP
+# - Admin interface on port 9901
+# - Loads API Fence from /usr/local/lib/libapi_fence.so
+# - Uses comprehensive.yaml as the default spec
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
+
+static_resources:
+  listeners:
+    - name: listener_0
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 10000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                codec_type: AUTO
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: backend
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          direct_response:
+                            status: 200
+                            body:
+                              inline_string: '{"status": "ok"}'
+                          response_headers_to_add:
+                            - header:
+                                key: "Content-Type"
+                                value: "application/json"
+                http_filters:
+                  # API Fence (Dynamic Module)
+                  - name: envoy.filters.http.dynamic_modules
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+                      dynamic_module_config:
+                        name: api_fence
+                        do_not_close: true
+                      filter_name: api_fence
+                      filter_config:
+                        "@type": type.googleapis.com/google.protobuf.StringValue
+                        value: |
+                          {
+                            "api_name": "test_api",
+                            "openapi_spec_path": "/etc/envoy/specs/comprehensive.yaml",
+                            "mocking": {
+                              "enabled": true
+                            }
+                          }
+                  # Router filter (required)
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
