@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # Envoy dynamic modules SDK - must match Envoy version
 envoy-proxy-dynamic-modules-rust-sdk = { git = "https://github.com/envoyproxy/envoy", rev = "c9cd0f5d4a70d68a8a1fbbc3f48cf1e028f33ad8" }
+#envoy-proxy-dynamic-modules-rust-sdk = { git = "https://github.com/envoyproxy/envoy", rev = "6d9bb7d9a85d616b220d1f8fe67b61f82bbdb8d3" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 # OpenAPI parsing and validation
@@ -45,12 +46,17 @@ thiserror = "1.0"
 rand = "0.8"
 uuid = { version = "1.0", features = ["v4"] }
 chrono = "0.4"
+# Glob patterns for file matching
+glob = "0.3"
 
 [dev-dependencies]
 # Integration testing dependencies
 tempfile = "3"
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", features = ["blocking", "json"] }
+
+[build-dependencies]
+regex = "1.10"
 
 [profile.release]
 opt-level = 3

@@ -20,6 +20,7 @@ pub mod config;
 pub mod error;
 pub mod filter;
 pub mod mock;
+pub mod modsec;
 pub mod observability;
 pub mod resolver;
 pub mod router;

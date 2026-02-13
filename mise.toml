@@ -1,0 +1,158 @@
+# Mise configuration for API Fence - Envoy OpenAPI Filter
+# Replaces the previous Nix/Flake setup
+
+[env]
+# Rust configuration
+RUST_BACKTRACE = "1"
+CARGO_HOME = "{{cwd}}/.cargo"
+
+# Required for building with bindgen (Envoy SDK)
+# These may need adjustment based on system LLVM installation
+_.path = ["{{cwd}}/.cargo/bin"]
+
+[tools]
+# Rust toolchain - stable with necessary components
+rust = "stable"
+
+# Development tools
+"cargo:cargo-watch" = "latest"
+"cargo:cargo-edit" = "latest"
+"cargo:cargo-outdated" = "latest"
+"cargo:bacon" = "latest"
+"cargo:cargo-audit" = "latest"
+
+# Documentation
+"cargo:mdbook" = "latest"
+
+# System tools (installed via package manager, mise just ensures they're available)
+jq = "latest"
+
+[tasks.build]
+description = "Build the filter in release mode"
+run = "cargo build --release"
+
+[tasks.build-dev]
+description = "Build the filter in debug mode"
+run = "cargo build"
+
+[tasks.test]
+description = "Run all tests"
+run = "cargo test"
+
+[tasks.test-unit]
+description = "Run unit tests only"
+run = "cargo test --lib"
+
+[tasks.test-integration]
+description = "Run integration tests only"
+run = "cargo test --test integration -- --ignored" 
+
+[tasks.test-modsec]
+description = "Run ModSecurity WAF integration tests"
+run = '''
+pkill -9 envoy 2>/dev/null || true
+sleep 1
+SKIP_FILTER_BUILD=1 cargo test --test integration test_modsecurity -- --ignored --test-threads=1
+'''
+
+[tasks.test-modsec-verbose]
+description = "Run ModSecurity WAF tests with verbose output"
+run = '''
+pkill -9 envoy 2>/dev/null || true
+sleep 1
+SKIP_FILTER_BUILD=1 cargo test --test integration test_modsecurity -- --ignored --test-threads=1 --nocapture
+''' 
+
+[tasks.check]
+description = "Check code without building"
+run = "cargo check --all-targets"
+
+[tasks.fmt]
+description = "Format code"
+run = "cargo fmt"
+
+[tasks.fmt-check]
+description = "Check code formatting"
+run = "cargo fmt -- --check"
+
+[tasks.clippy]
+description = "Run clippy linter"
+run = "cargo clippy --all-targets -- -D warnings"
+
+[tasks.doc]
+description = "Generate and open documentation"
+run = "cargo doc --no-deps --open"
+
+[tasks.watch]
+description = "Watch for changes and run tests"
+run = "cargo watch -x test"
+
+[tasks.watch-clippy]
+description = "Watch for changes and run clippy"
+run = "cargo watch -x clippy"
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = "cargo clean && rm -rf target/"
+
+[tasks.audit]
+description = "Audit dependencies for security issues"
+run = "cargo audit"
+
+[tasks.quality]
+description = "Run all quality checks (fmt-check, clippy, test)"
+depends = ["fmt-check", "clippy", "test"]
+
+[tasks.pre-commit]
+description = "Pre-commit hook checks (fmt, clippy, test)"
+depends = ["fmt", "clippy", "test"]
+
+[tasks.run-envoy]
+description = "Run Envoy with the filter (set ENVOY_CONFIG)"
+run = '''
+if [ -z "$ENVOY_CONFIG" ]; then
+  echo "Error: ENVOY_CONFIG environment variable not set"
+  echo "Usage: mise run run-envoy ENVOY_CONFIG=path/to/config.yaml"
+  exit 1
+fi
+envoy -c "$ENVOY_CONFIG" -l debug
+'''
+
+[tasks.ci]
+description = "CI pipeline (format check, clippy, tests, audit, release build)"
+run = '''
+set -euo pipefail
+
+echo "==> Checking formatting"
+mise run fmt-check
+
+echo "==> Running clippy"
+mise run clippy
+
+echo "==> Running tests"
+mise run test
+
+echo "==> Auditing dependencies"
+mise run audit
+
+echo "==> Building release artifact"
+mise run build
+
+echo "✅ CI completed successfully"
+'''
+
+[tasks.info]
+description = "Show development environment info"
+run = '''
+echo "Envoy OpenAPI Filter Development Environment"
+echo "============================================="
+echo "Rust version: $(rustc --version)"
+echo "Cargo version: $(cargo --version)"
+echo "Envoy version: $(envoy --version 2>&1 | head -n1 || echo 'envoy not found')"
+echo ""
+echo "Available tasks: mise tasks"
+'''
+
+[tasks.help]
+description = "Show available tasks"
+run = "mise tasks"

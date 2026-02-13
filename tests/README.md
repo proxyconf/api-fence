@@ -5,14 +5,23 @@ This directory contains integration tests for the API Fence.
 ## Test Structure
 
 - `integration.rs` - Core integration test infrastructure, including `EnvoyTestServer`
-- `fuzzing.rs` - OpenAPI fuzzing tests using `openapi-fuzzer`
+- `integration_tests/` - Modular integration test suite:
+  - `test_modsecurity.rs` - ModSecurity WAF integration tests
+  - `test_path_validation.rs` - Path parameter validation tests
+  - `test_query_validation.rs` - Query parameter validation tests
+  - `test_body_validation.rs` - Request body validation tests
+  - `test_header_validation.rs` - Header validation tests
+  - `test_security_limits.rs` - Security limits and DoS protection tests
+  - `test_mock_responses.rs` - Mock response generation tests
+  - `test_error_responses.rs` - Error response format tests
+- `fuzzing.rs` - OpenAPI fuzzing tests
 
 ## Running Tests
 
 ### Quick Test (Unit Tests Only)
 
 ```bash
-cargo test
+mise run test-unit
 ```
 
 ### Integration Tests (with Envoy)
@@ -20,16 +29,26 @@ cargo test
 Integration tests are marked with `#[ignore]` because they require:
 1. Building the filter
 2. Starting Envoy
-3. External dependencies (envoy-bin, openapi-fuzzer)
+3. External dependencies (envoy binary, libmodsecurity)
 
 Run them explicitly:
 
 ```bash
 # Run all integration tests
+mise run test-integration
+
+# Or manually:
 cargo test --test integration -- --ignored --nocapture
 
 # Run specific integration test
-cargo test --test integration test_envoy_starts_with_filter -- --ignored --nocapture
+cargo test --test integration test_modsecurity -- --ignored --test-threads=1
+```
+
+### ModSecurity WAF Tests
+
+```bash
+# Run ModSecurity integration tests
+SKIP_FILTER_BUILD=1 cargo test --test integration test_modsecurity -- --ignored --test-threads=1
 ```
 
 ### OpenAPI Fuzzing Tests
@@ -149,18 +168,17 @@ assert_eq!(findings_count, 0, "Fuzzer found {} issues", findings_count);
 
 ### "Failed to start Envoy"
 
-- Ensure `envoy-bin` is in PATH (use `nix develop`)
+- Ensure `envoy` is in PATH or available locally
 - Check that port 10000 and 9901 are not in use
 - Review Envoy logs in test output
 
 ### "openapi-fuzzer: command not found"
 
-- Enter the Nix shell: `nix develop`
-- Or install: `cargo install openapi-fuzzer`
+- Install: `cargo install openapi-fuzzer`
 
 ### "Filter not found"
 
-- Build the filter first: `cargo build --release`
+- Build the filter first: `mise run build`
 - Check that `target/release/libapi_fence.so` exists
 
 ### Tests hang
@@ -168,6 +186,7 @@ assert_eq!(findings_count, 0, "Fuzzer found {} issues", findings_count);
 - Envoy might not be starting correctly
 - Check logs with `--nocapture` flag
 - Verify the filter builds without errors
+- Kill any stuck processes: `pkill -9 envoy`
 
 ## Adding New Tests
 

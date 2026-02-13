@@ -1,7 +1,14 @@
 //! Native Envoy process management for integration tests
 //!
 //! This module manages a single Envoy process that runs for the lifetime of
-//! the test suite. It uses the Envoy binary provided by the Nix flake.
+//! the test suite. The process hosts TWO listeners:
+//!
+//! - **Validation listener** (port 18080): OpenAPI validation only, no ModSecurity
+//! - **ModSecurity listener** (port 18090): OpenAPI validation + ModSecurity WAF
+//!
+//! Both listeners share the same Envoy process, admin interface, and filter `.so`.
+//! This proves that multiple filter instances with different configs can coexist
+//! in a single Envoy, and eliminates the need for separate Envoy processes.
 
 use std::fs;
 use std::path::PathBuf;
@@ -43,7 +50,8 @@ impl EnvoyError {
 }
 
 /// Fixed ports for the shared Envoy process
-const HTTP_PORT: u16 = 18080;
+const VALIDATION_PORT: u16 = 18080;
+const MODSEC_PORT: u16 = 18090;
 const ADMIN_PORT: u16 = 18081;
 
 /// Path to store the Envoy PID for cleanup
@@ -51,9 +59,12 @@ const PID_FILE: &str = "/tmp/envoy-integration-test.pid";
 
 /// A shared Envoy process that runs for the lifetime of the test suite.
 ///
-/// This process is started once and reused by all tests. It uses fixed ports
-/// and the comprehensive.yaml spec which includes all endpoints needed by
-/// all test modules.
+/// This process hosts two listeners with different filter configurations:
+/// - Port 18080: validation-only (no ModSecurity)
+/// - Port 18090: validation + ModSecurity WAF scanning
+///
+/// Both listeners use the same `comprehensive.yaml` OpenAPI spec and the same
+/// filter `.so`, but with different `filter_config` JSON payloads.
 ///
 /// Note: Envoy is started via `setsid` to create a new session, which prevents
 /// the parent death signal (PR_SET_PDEATHSIG) from killing Envoy when test
@@ -73,20 +84,27 @@ fn use_release_mode() -> bool {
 }
 
 impl EnvoyProcess {
-    /// Start the shared Envoy process.
+    /// Start the shared Envoy process with both listeners.
     ///
-    /// This builds the filter (if needed), starts Envoy with the comprehensive
-    /// spec, and waits for it to become ready.
+    /// This builds the filter (if needed), starts Envoy with two listeners
+    /// (validation-only and modsec), and waits for it to become ready.
     ///
     /// By default, uses debug builds for faster iteration. Set environment
     /// variable `INTEGRATION_TEST_RELEASE=1` to use release builds.
     pub fn start() -> Result<Self, EnvoyError> {
-        // Check if ports are already in use
-        if Self::is_port_in_use(HTTP_PORT) {
-            return Err(EnvoyError::new(format!(
-                "Port {} is already in use. Stop any existing Envoy processes first.",
-                HTTP_PORT
-            )));
+        // Check if any of our ports are already in use
+        for (name, port) in [
+            ("validation", VALIDATION_PORT),
+            ("modsec", MODSEC_PORT),
+            ("admin", ADMIN_PORT),
+        ] {
+            if Self::is_port_in_use(port) {
+                return Err(EnvoyError::new(format!(
+                    "Port {} ({}) is already in use. Stop any existing Envoy processes first.\n\
+                     Hint: pkill -f 'envoy.*integration'; rm -f {}",
+                    port, name, PID_FILE
+                )));
+            }
         }
 
         let release_mode = use_release_mode();
@@ -114,7 +132,7 @@ impl EnvoyProcess {
         let spec_abs_path = fs::canonicalize(&spec_path)
             .map_err(|e| EnvoyError::new(format!("Failed to canonicalize spec path: {}", e)))?;
 
-        // Generate and write Envoy config
+        // Generate and write unified Envoy config
         let config = Self::generate_config(&filter_abs_path, &spec_abs_path);
         let config_path = std::env::temp_dir().join("envoy-integration-test.yaml");
         fs::write(&config_path, &config)
@@ -129,8 +147,8 @@ impl EnvoyProcess {
             .ok_or_else(|| EnvoyError::new("Failed to get filter directory"))?;
 
         eprintln!(
-            "Starting Envoy (HTTP: {}, Admin: {})...",
-            HTTP_PORT, ADMIN_PORT
+            "Starting Envoy (Validation: {}, ModSec: {}, Admin: {})...",
+            VALIDATION_PORT, MODSEC_PORT, ADMIN_PORT
         );
         eprintln!("  Config: {}", config_path.display());
         eprintln!("  Filter dir: {}", filter_dir.display());
@@ -175,10 +193,10 @@ impl EnvoyProcess {
             log_path,
         };
 
-        // Wait for Envoy to be ready
+        // Wait for Envoy to be ready (admin endpoint serves both listeners)
         envoy.wait_for_ready(30)?;
 
-        eprintln!("Envoy is ready!");
+        eprintln!("Envoy is ready! (both listeners active)");
 
         Ok(envoy)
     }
@@ -229,7 +247,15 @@ impl EnvoyProcess {
         Ok(manifest_dir)
     }
 
-    /// Generate Envoy configuration
+    /// Generate unified Envoy configuration with two listeners.
+    ///
+    /// Listener 1 (validation-only): Port 18080
+    ///   - OpenAPI validation with mocking enabled
+    ///   - No ModSecurity scanning
+    ///
+    /// Listener 2 (modsec): Port 18090
+    ///   - OpenAPI validation with mocking enabled
+    ///   - ModSecurity WAF scanning with bundled CRS "minimal" profile
     fn generate_config(_filter_path: &PathBuf, spec_path: &PathBuf) -> String {
         format!(
             r#"admin:
@@ -240,22 +266,28 @@ impl EnvoyProcess {
 
 static_resources:
   listeners:
-    - name: listener_0
+    # =========================================================================
+    # Listener 1: Validation-only (no ModSecurity)
+    # Used by: test_path_validation, test_query_validation, test_header_validation,
+    #          test_body_validation, test_mock_responses, test_error_responses,
+    #          test_security_limits
+    # =========================================================================
+    - name: validation_listener
       address:
         socket_address:
           address: 127.0.0.1
-          port_value: {http_port}
+          port_value: {validation_port}
       filter_chains:
         - filters:
             - name: envoy.filters.network.http_connection_manager
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-                stat_prefix: ingress_http
+                stat_prefix: validation_http
                 codec_type: AUTO
                 route_config:
-                  name: local_route
+                  name: validation_route
                   virtual_hosts:
-                    - name: backend
+                    - name: validation_backend
                       domains: ["*"]
                       routes:
                         - match:
@@ -285,9 +317,74 @@ static_resources:
                   - name: envoy.filters.http.router
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+    # =========================================================================
+    # Listener 2: Validation + ModSecurity WAF
+    # Used by: test_modsecurity
+    # =========================================================================
+    - name: modsec_listener
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: {modsec_port}
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: modsec_http
+                codec_type: AUTO
+                route_config:
+                  name: modsec_route
+                  virtual_hosts:
+                    - name: modsec_backend
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          direct_response:
+                            status: 200
+                            body:
+                              inline_string: '{{"status": "ok"}}'
+                http_filters:
+                  - name: envoy.filters.http.dynamic_modules
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+                      dynamic_module_config:
+                        name: api_fence
+                        do_not_close: true
+                      filter_name: api_fence
+                      filter_config:
+                        "@type": type.googleapis.com/google.protobuf.StringValue
+                        value: |
+                          {{
+                            "api_name": "modsec_test",
+                            "openapi_spec_path": "{spec_path}",
+                            "mocking": {{
+                              "enabled": true
+                            }},
+                            "modsecurity": {{
+                              "scan_request": true,
+                              "scan_response": false,
+                              "request_action": "block",
+                              "pool": {{
+                                "thread_count": 1,
+                                "timeout_ms": 2000
+                              }},
+                              "primary_ruleset": {{
+                                "name": "bundled_crs",
+                                "use_bundled_crs": true,
+                                "bundled_crs_profile": "minimal"
+                              }}
+                            }}
+                          }}
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 "#,
             admin_port = ADMIN_PORT,
-            http_port = HTTP_PORT,
+            validation_port = VALIDATION_PORT,
+            modsec_port = MODSEC_PORT,
             spec_path = spec_path.display(),
         )
     }
@@ -318,9 +415,14 @@ static_resources:
         Err(EnvoyError::new("Envoy failed to become ready within timeout").with_logs(logs))
     }
 
-    /// Get the HTTP base URL for this Envoy instance
-    pub fn base_url(&self) -> String {
-        format!("http://127.0.0.1:{}", HTTP_PORT)
+    /// Get the base URL for the validation-only listener (port 18080)
+    pub fn validation_base_url(&self) -> String {
+        format!("http://127.0.0.1:{}", VALIDATION_PORT)
+    }
+
+    /// Get the base URL for the ModSecurity listener (port 18090)
+    pub fn modsec_base_url(&self) -> String {
+        format!("http://127.0.0.1:{}", MODSEC_PORT)
     }
 
     /// Get Envoy logs
@@ -376,8 +478,15 @@ mod tests {
         assert!(config.contains("comprehensive.yaml"));
         assert!(config.contains("mocking"));
         assert!(config.contains("api_fence")); // filter name in config
-        assert!(config.contains(&HTTP_PORT.to_string()));
+        assert!(config.contains(&VALIDATION_PORT.to_string()));
+        assert!(config.contains(&MODSEC_PORT.to_string()));
         assert!(config.contains(&ADMIN_PORT.to_string()));
+        // Both listeners present
+        assert!(config.contains("validation_listener"));
+        assert!(config.contains("modsec_listener"));
+        // ModSecurity config only on second listener
+        assert!(config.contains("modsecurity"));
+        assert!(config.contains("bundled_crs_profile"));
         // filename should NOT be in config - uses ENVOY_DYNAMIC_MODULES_SEARCH_PATH instead
         assert!(!config.contains("filename:"));
     }

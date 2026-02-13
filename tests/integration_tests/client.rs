@@ -282,6 +282,29 @@ impl TestResponse {
     pub fn problem_details(self) -> ProblemDetails {
         self.json()
     }
+
+    /// Assert this is a WAF block (403 with expected response structure)
+    pub fn assert_waf_blocked(self) -> Self {
+        let status = self.response().status();
+        assert_eq!(
+            status.as_u16(),
+            403,
+            "Expected WAF block to return 403, got {}",
+            status
+        );
+        self
+    }
+
+    /// Assert the response body contains a substring (consumes the response)
+    pub fn assert_body_contains(self, substring: &str) {
+        let body = self.text();
+        assert!(
+            body.contains(substring),
+            "Expected body to contain '{}', got: '{}'",
+            substring,
+            &body[..body.len().min(500)]
+        );
+    }
 }
 
 /// RFC 7807 Problem Details structure for error responses
@@ -295,6 +318,10 @@ pub struct ProblemDetails {
     pub instance: Option<String>,
     #[serde(default)]
     pub errors: Vec<ValidationError>,
+    /// WAF-specific: rule ID that triggered the block
+    pub rule_id: Option<u32>,
+    /// WAF-specific: message from the matched rule
+    pub rule_message: Option<String>,
 }
 
 /// Validation error detail
@@ -345,6 +372,51 @@ impl ProblemDetails {
         assert!(
             !self.errors.is_empty(),
             "Expected validation errors to be present"
+        );
+        self
+    }
+
+    /// Assert this is a WAF block response (has rule_id or WAF-related type)
+    pub fn assert_waf_blocked(self) -> Self {
+        let error_type = self.error_type.as_deref().unwrap_or("");
+        let is_waf_block =
+            error_type.contains("waf") || error_type.contains("blocked") || self.rule_id.is_some();
+        assert!(
+            is_waf_block,
+            "Expected WAF block response, got type: '{}', rule_id: {:?}",
+            error_type, self.rule_id
+        );
+        self
+    }
+
+    /// Assert the response has a rule ID
+    pub fn assert_has_rule_id(self) -> Self {
+        assert!(
+            self.rule_id.is_some(),
+            "Expected rule_id to be present in WAF response"
+        );
+        self
+    }
+
+    /// Assert the rule ID matches expected value
+    pub fn assert_rule_id(self, expected: u32) -> Self {
+        let actual = self.rule_id.unwrap_or(0);
+        assert_eq!(
+            actual, expected,
+            "Expected rule_id {}, got {}",
+            expected, actual
+        );
+        self
+    }
+
+    /// Assert the rule message contains a substring
+    pub fn assert_rule_message_contains(self, substring: &str) -> Self {
+        let message = self.rule_message.as_deref().unwrap_or("");
+        assert!(
+            message.contains(substring),
+            "Expected rule_message to contain '{}', got '{}'",
+            substring,
+            message
         );
         self
     }

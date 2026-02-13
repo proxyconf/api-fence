@@ -8,10 +8,13 @@
 //! - `header`: HTTP header validation
 //! - `body`: Request/response body validation
 //! - `response`: Response-specific validation
+//! - `pool`: Thread pool for offloading validation work
 
 pub mod body;
+pub mod global;
 pub mod header;
 pub mod path;
+pub mod pool;
 pub mod query;
 pub mod response;
 
@@ -19,5 +22,6 @@ pub mod response;
 pub use body::{body_to_json, body_to_json_secure, coerce_form_data_to_schema, find_matching_content_type, parse_form_urlencoded_to_json, parse_multipart_to_json, parse_xml_to_json};
 pub use header::{validate_request_headers, validate_response_headers};
 pub use path::{validate_path_param_types, ParamSchema};
+pub use pool::{ValidationJobType, ValidationPool, ValidationPoolConfig, ValidationResult, ValidationTimeoutAction};
 pub use query::{convert_param_to_json, validate_query_params};
 pub use response::{get_response_for_status, validate_response_body};

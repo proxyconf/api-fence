@@ -732,8 +732,8 @@ jobs:
 ### Development Workflow
 
 ```bash
-# 1. Enter nix environment
-nix develop
+# 1. Set up development environment
+mise install && mise trust
 
 # 2. Watch mode for development
 bacon
@@ -742,7 +742,7 @@ bacon
 cargo watch -x test
 
 # 4. Full integration test before PR
-make test-all
+mise run quality
 ```
 
 ---

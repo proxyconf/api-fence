@@ -5,14 +5,18 @@ An HTTP filter for Envoy Proxy that validates requests against OpenAPI specifica
 ## Quick Start
 
 ```bash
+# Install mise (if not already installed)
+# See https://mise.jdx.dev/getting-started.html
+
 # Enter development environment
-nix develop
+mise install
+mise trust
 
 # Build the filter
-cargo build --release
+mise run build
 
 # Run tests
-cargo test
+mise run test
 
 # The compiled filter is at:
 # target/release/libapi_fence.so
@@ -81,17 +85,18 @@ Use these in access logs to track validation issues:
 
 ## Development
 
-This project uses Nix for reproducible development environments. See [Agent.md](./Agent.md) for detailed documentation.
+This project uses [Mise](https://mise.jdx.dev/) for development environment management. See [Agent.md](./Agent.md) for detailed documentation.
 
 ### Requirements
 
-- Nix with flakes enabled
-- (Optional) direnv for automatic environment loading
+- [Mise](https://mise.jdx.dev/getting-started.html) installed
+- System dependencies: libmodsecurity3-dev, clang, llvm (for bindgen)
+- (Optional) Envoy binary for integration tests
 
 ### Building
 
 ```bash
-cargo build --release
+mise run build  # or: cargo build --release
 ```
 
 The compiled shared library will be at `target/release/libapi_fence.so`.
@@ -100,16 +105,19 @@ The compiled shared library will be at `target/release/libapi_fence.so`.
 
 ```bash
 # Unit tests
-cargo test
+mise run test-unit
 
 # Integration tests with Envoy
-cargo test --test integration -- --ignored --nocapture
+mise run test-integration
 
-# OpenAPI fuzzing tests
-cargo test --test fuzzing -- --ignored --nocapture
+# All tests
+mise run test
+
+# See available tasks
+mise tasks
 ```
 
-See [TESTING.md](./TESTING.md) and [tests/README.md](./tests/README.md) for details.
+See [tests/README.md](./tests/README.md) for details.
 
 ## Configuration
 

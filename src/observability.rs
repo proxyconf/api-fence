@@ -21,6 +21,30 @@ pub struct FilterMetrics {
     pub request_validation_errors: EnvoyCounterId,
     /// Response validation error counter
     pub response_validation_errors: EnvoyCounterId,
+
+    // ModSecurity request scanning metrics
+    /// ModSecurity request scans performed
+    pub modsec_request_scans: EnvoyCounterId,
+    /// ModSecurity request blocks
+    pub modsec_request_blocked: EnvoyCounterId,
+    /// ModSecurity request alerts (matched but not blocked)
+    pub modsec_request_alerts: EnvoyCounterId,
+    /// ModSecurity request scan timeouts
+    pub modsec_request_timeouts: EnvoyCounterId,
+    /// ModSecurity request scan time histogram (milliseconds)
+    pub modsec_request_scan_time_ms: EnvoyHistogramId,
+
+    // ModSecurity response scanning metrics
+    /// ModSecurity response scans performed
+    pub modsec_response_scans: EnvoyCounterId,
+    /// ModSecurity response blocks
+    pub modsec_response_blocked: EnvoyCounterId,
+    /// ModSecurity response alerts (matched but not blocked)
+    pub modsec_response_alerts: EnvoyCounterId,
+    /// ModSecurity response scan timeouts
+    pub modsec_response_timeouts: EnvoyCounterId,
+    /// ModSecurity response scan time histogram (milliseconds)
+    pub modsec_response_scan_time_ms: EnvoyHistogramId,
 }
 
 impl FilterMetrics {
@@ -80,12 +104,109 @@ impl FilterMetrics {
                 message: format!("Failed to define counter: {:?}", e),
             })?;
 
+        // ModSecurity request metrics
+        let modsec_request_scans_name = format!("api_fence.{}.modsec.request.scans", api_name);
+        let modsec_request_scans = envoy_config
+            .define_counter(&modsec_request_scans_name)
+            .map_err(|e| ConfigError::MetricDefinitionError {
+                name: modsec_request_scans_name,
+                message: format!("Failed to define counter: {:?}", e),
+            })?;
+
+        let modsec_request_blocked_name = format!("api_fence.{}.modsec.request.blocked", api_name);
+        let modsec_request_blocked = envoy_config
+            .define_counter(&modsec_request_blocked_name)
+            .map_err(|e| ConfigError::MetricDefinitionError {
+                name: modsec_request_blocked_name,
+                message: format!("Failed to define counter: {:?}", e),
+            })?;
+
+        let modsec_request_alerts_name = format!("api_fence.{}.modsec.request.alerts", api_name);
+        let modsec_request_alerts = envoy_config
+            .define_counter(&modsec_request_alerts_name)
+            .map_err(|e| ConfigError::MetricDefinitionError {
+                name: modsec_request_alerts_name,
+                message: format!("Failed to define counter: {:?}", e),
+            })?;
+
+        let modsec_request_timeouts_name =
+            format!("api_fence.{}.modsec.request.timeouts", api_name);
+        let modsec_request_timeouts = envoy_config
+            .define_counter(&modsec_request_timeouts_name)
+            .map_err(|e| ConfigError::MetricDefinitionError {
+                name: modsec_request_timeouts_name,
+                message: format!("Failed to define counter: {:?}", e),
+            })?;
+
+        let modsec_request_scan_time_name =
+            format!("api_fence.{}.modsec.request.scan_time_ms", api_name);
+        let modsec_request_scan_time_ms = envoy_config
+            .define_histogram(&modsec_request_scan_time_name)
+            .map_err(|e| ConfigError::MetricDefinitionError {
+                name: modsec_request_scan_time_name,
+                message: format!("Failed to define histogram: {:?}", e),
+            })?;
+
+        // ModSecurity response metrics
+        let modsec_response_scans_name = format!("api_fence.{}.modsec.response.scans", api_name);
+        let modsec_response_scans = envoy_config
+            .define_counter(&modsec_response_scans_name)
+            .map_err(|e| ConfigError::MetricDefinitionError {
+                name: modsec_response_scans_name,
+                message: format!("Failed to define counter: {:?}", e),
+            })?;
+
+        let modsec_response_blocked_name =
+            format!("api_fence.{}.modsec.response.blocked", api_name);
+        let modsec_response_blocked = envoy_config
+            .define_counter(&modsec_response_blocked_name)
+            .map_err(|e| ConfigError::MetricDefinitionError {
+                name: modsec_response_blocked_name,
+                message: format!("Failed to define counter: {:?}", e),
+            })?;
+
+        let modsec_response_alerts_name = format!("api_fence.{}.modsec.response.alerts", api_name);
+        let modsec_response_alerts = envoy_config
+            .define_counter(&modsec_response_alerts_name)
+            .map_err(|e| ConfigError::MetricDefinitionError {
+                name: modsec_response_alerts_name,
+                message: format!("Failed to define counter: {:?}", e),
+            })?;
+
+        let modsec_response_timeouts_name =
+            format!("api_fence.{}.modsec.response.timeouts", api_name);
+        let modsec_response_timeouts = envoy_config
+            .define_counter(&modsec_response_timeouts_name)
+            .map_err(|e| ConfigError::MetricDefinitionError {
+                name: modsec_response_timeouts_name,
+                message: format!("Failed to define counter: {:?}", e),
+            })?;
+
+        let modsec_response_scan_time_name =
+            format!("api_fence.{}.modsec.response.scan_time_ms", api_name);
+        let modsec_response_scan_time_ms = envoy_config
+            .define_histogram(&modsec_response_scan_time_name)
+            .map_err(|e| ConfigError::MetricDefinitionError {
+                name: modsec_response_scan_time_name,
+                message: format!("Failed to define histogram: {:?}", e),
+            })?;
+
         Ok(Self {
             cache_hits,
             cache_misses,
             schema_compile_time_ms,
             request_validation_errors,
             response_validation_errors,
+            modsec_request_scans,
+            modsec_request_blocked,
+            modsec_request_alerts,
+            modsec_request_timeouts,
+            modsec_request_scan_time_ms,
+            modsec_response_scans,
+            modsec_response_blocked,
+            modsec_response_alerts,
+            modsec_response_timeouts,
+            modsec_response_scan_time_ms,
         })
     }
 

@@ -5,10 +5,14 @@
 //! - Cache configuration (`CacheConfig`)
 //! - Validation behavior configuration (`ValidationConfig`)
 //! - Security limits configuration (`SecurityLimits`)
+//! - ModSecurity configuration (`ModSecurityConfig`)
+//! - Validation pool configuration (`ValidationPoolConfig`)
 
 use crate::error::{ConfigError, ConfigResult};
 use crate::mock::MockConfig;
+use crate::modsec::ModSecurityConfig;
 use crate::security::SecurityLimits;
+use crate::validation::pool::ValidationPoolConfig;
 use serde::Deserialize;
 
 /// Main configuration for the API Fence filter
@@ -45,6 +49,10 @@ pub struct Config {
     /// Security limits configuration
     #[serde(default)]
     pub security: SecurityLimits,
+
+    /// ModSecurity WAF configuration (optional)
+    #[serde(default)]
+    pub modsecurity: ModSecurityConfig,
 }
 
 impl Config {
@@ -97,6 +105,14 @@ impl Config {
                 message: e.to_string(),
             })?;
 
+        // Validate ModSecurity configuration
+        self.modsecurity
+            .validate()
+            .map_err(|e| ConfigError::InvalidValue {
+                field: "modsecurity".to_string(),
+                message: e,
+            })?;
+
         Ok(())
     }
 
@@ -143,6 +159,13 @@ pub struct ValidationConfig {
     /// If false, validation errors are recorded in metrics and metadata but response continues
     #[serde(default)]
     pub fail_on_response_error: bool,
+
+    /// Validation thread pool configuration (optional)
+    ///
+    /// When enabled, JSON schema validation is offloaded to a thread pool
+    /// to avoid blocking Envoy worker threads.
+    #[serde(default)]
+    pub pool: ValidationPoolConfig,
 }
 
 fn default_true() -> bool {
@@ -156,6 +179,7 @@ impl Default for ValidationConfig {
             validate_response: false,
             fail_on_request_error: true,
             fail_on_response_error: false,
+            pool: ValidationPoolConfig::default(),
         }
     }
 }

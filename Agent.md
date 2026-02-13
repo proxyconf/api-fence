@@ -7,7 +7,8 @@ This project implements an HTTP filter for Envoy Proxy using Rust and the Envoy 
 ### Technology Stack
 
 - **Language**: Rust (stable)
-- **Build System**: Cargo + Nix
+- **Build System**: Cargo
+- **Dev Environment**: Mise (https://mise.jdx.dev/)
 - **Target**: Envoy Dynamic Module (shared library)
 - **Envoy Version**: v1.37.0 (commit: 6d9bb7d9a85d616b220d1f8fe67b61f82bbdb8d3)
 - **Testing Strategy**: Integration-test driven development with OpenAPI fuzzing
@@ -36,8 +37,9 @@ The filter implements the following callback methods:
 
 ### Prerequisites
 
-- Nix with flakes enabled
-- direnv (optional but recommended)
+- Mise (https://mise.jdx.dev/) for development environment
+- Envoy binary with dynamic module support (v1.37.0+)
+- System LLVM/Clang for bindgen
 
 ### Getting Started
 
@@ -46,20 +48,21 @@ The filter implements the following callback methods:
 git clone <repo-url>
 cd api_fence
 
-# If using direnv, allow the .envrc file
-direnv allow
-
-# Otherwise, manually enter the Nix shell
-nix develop
+# Install mise tools
+mise install
+mise trust
 
 # Build the project
+mise run build
+
+# Or using cargo directly
 cargo build --release
 
 # Run tests
-cargo test
+mise run test
 
 # Run linter
-cargo clippy
+mise run clippy
 ```
 
 ### Project Structure
@@ -68,10 +71,10 @@ cargo clippy
 api_fence/
 ├── src/
 │   └── lib.rs              # Main filter implementation
-├── tests/                  # Integration tests (to be created)
+├── tests/                  # Integration tests
+│   └── integration_tests/  # Test modules
 ├── Cargo.toml              # Rust dependencies and build config
-├── flake.nix               # Nix development environment
-├── .envrc                  # Direnv integration
+├── mise.toml               # Mise development environment
 ├── bacon.toml              # Bacon watcher config
 ├── rustfmt.toml            # Rust formatting config
 ├── .clippy.toml            # Clippy linter config
@@ -213,9 +216,10 @@ bacon test
 
 ### Build Errors
 
-- **"cannot find crate"**: Run `nix develop` to ensure all dependencies are available
+- **"cannot find crate"**: Ensure you have run `mise install` to set up the development environment
 - **ABI mismatch**: Ensure Envoy SDK version exactly matches your Envoy binary version
-- **Linking errors**: Check that all system libraries are available (usually provided by Nix)
+- **Linking errors**: Check that LLVM/Clang is installed for bindgen (`apt install llvm-dev libclang-dev` or equivalent)
+- **"libclang not found"**: Set `LIBCLANG_PATH` to your system's libclang location
 
 ### Runtime Errors
 
