@@ -1,15 +1,15 @@
-# Envoy Configuration Template for Integration Testing
+# Sample Envoy Configuration for Local Development
 #
-# This is a sample configuration for local development.
-# In actual tests, config is generated dynamically by container.rs.
+# This is NOT used by integration tests (see integration-test.yaml instead).
+# It serves as a reference configuration for manual local testing.
 #
 # Usage:
-#   docker-compose up
+#   ENVOY_DYNAMIC_MODULES_SEARCH_PATH=target/debug envoy -c tests/fixtures/envoy/envoy.yaml
 #
 # This configuration:
 # - Listens on port 10000 for HTTP
 # - Admin interface on port 9901
-# - Loads API Fence from /usr/local/lib/libapi_fence.so
+# - Loads API Fence from target directory
 # - Uses comprehensive.yaml as the default spec
 
 admin:

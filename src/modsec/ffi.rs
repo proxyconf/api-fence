@@ -71,8 +71,7 @@ impl Default for ModSecurityIntervention {
     }
 }
 
-// Link against libmodsecurity
-#[link(name = "modsecurity")]
+// Link directives are emitted by build.rs (static linking)
 extern "C" {
     // =========================================================================
     // Core ModSecurity Engine Functions
@@ -97,7 +96,7 @@ extern "C" {
     /// # Arguments
     /// - `msc`: ModSecurity engine handle
     /// - `cb`: Callback function with signature: fn(*mut c_void, *const c_void)
-    ///         First arg is user data, second is the log message (const char*)
+    ///   First arg is user data, second is the log message (const char*)
     pub fn msc_set_log_cb(
         msc: *mut ModSecurity,
         cb: Option<unsafe extern "C" fn(*mut c_void, *const c_void)>,

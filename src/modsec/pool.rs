@@ -199,7 +199,7 @@ pub struct ScanJob {
 /// Message sent to worker threads
 enum WorkerMessage {
     /// A job to process
-    Job(ScanJob),
+    Job(Box<ScanJob>),
     /// Shutdown signal
     Shutdown,
 }
@@ -303,7 +303,7 @@ impl ScannerPool {
         };
 
         self.job_sender
-            .send(WorkerMessage::Job(job))
+            .send(WorkerMessage::Job(Box::new(job)))
             .map_err(|_| ModSecError::PoolError {
                 message: "pool has been shut down".to_string(),
             })?;

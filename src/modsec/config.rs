@@ -2,14 +2,16 @@
 //!
 //! This module defines configuration types for ModSecurity integration.
 
+use schemars::JsonSchema;
 use serde::Deserialize;
 
 /// Main ModSecurity configuration
 ///
 /// This configures all aspects of WAF scanning including request/response
 /// scanning, thread pool settings, and ruleset configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(default)]
+#[schemars(title = "ModSecurity Configuration")]
 pub struct ModSecurityConfig {
     /// Enable request body scanning (default: false)
     pub scan_request: bool,
@@ -96,7 +98,7 @@ impl ModSecurityConfig {
 }
 
 /// Action to take when ModSecurity rules match
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 #[derive(Default)]
 pub enum ScanAction {
@@ -113,8 +115,9 @@ pub enum ScanAction {
 /// the `API_FENCE_MODSEC_THREADS` environment variable or defaults
 /// to the number of available CPUs. This struct retains per-API
 /// timeout and queue settings.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(default)]
+#[schemars(title = "Scanner Pool Configuration")]
 pub struct ScannerPoolConfig {
     /// Maximum scan timeout in milliseconds (default: 100)
     pub timeout_ms: u64,
@@ -152,7 +155,7 @@ impl ScannerPoolConfig {
 }
 
 /// Action to take when scan timeout is exceeded
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 #[derive(Default)]
 pub enum TimeoutAction {
@@ -164,7 +167,8 @@ pub enum TimeoutAction {
 }
 
 /// Configuration for a ModSecurity ruleset
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[schemars(title = "Ruleset Configuration")]
 pub struct RulesetConfig {
     /// Unique name for this ruleset (used in metrics and metadata)
     pub name: String,
@@ -243,7 +247,7 @@ impl RulesetConfig {
         let rules = match self.bundled_crs_profile.as_str() {
             "minimal" => bundled_crs::minimal_rules(),
             "request" => bundled_crs::request_rules_only(),
-            "full" | _ => bundled_crs::all_rules(),
+            _ => bundled_crs::all_rules(), // "full" or any unrecognized profile
         };
 
         Some(rules)
@@ -286,7 +290,8 @@ impl RulesetConfig {
 }
 
 /// Configuration for loading rules from a remote URL
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[schemars(title = "Remote Rules Configuration")]
 pub struct RemoteRulesConfig {
     /// URL to fetch rules from
     pub url: String,
@@ -297,8 +302,9 @@ pub struct RemoteRulesConfig {
 }
 
 /// Configuration for JSON string extraction optimization
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(default)]
+#[schemars(title = "String Extractor Configuration")]
 pub struct StringExtractorConfig {
     /// Maximum number of unique strings to extract (default: 1000)
     pub max_unique_strings: usize,
@@ -353,8 +359,10 @@ mod tests {
 
     #[test]
     fn test_config_validation_no_ruleset() {
-        let mut config = ModSecurityConfig::default();
-        config.scan_request = true;
+        let config = ModSecurityConfig {
+            scan_request: true,
+            ..Default::default()
+        };
 
         let result = config.validate();
         assert!(result.is_err());
@@ -363,16 +371,18 @@ mod tests {
 
     #[test]
     fn test_config_validation_with_ruleset() {
-        let mut config = ModSecurityConfig::default();
-        config.scan_request = true;
-        config.primary_ruleset = Some(RulesetConfig {
-            name: "crs".to_string(),
-            use_bundled_crs: false,
-            bundled_crs_profile: "full".to_string(),
-            rules_path: vec!["/etc/modsecurity/crs/*.conf".to_string()],
-            rules_remote: None,
-            rules_inline: None,
-        });
+        let config = ModSecurityConfig {
+            scan_request: true,
+            primary_ruleset: Some(RulesetConfig {
+                name: "crs".to_string(),
+                use_bundled_crs: false,
+                bundled_crs_profile: "full".to_string(),
+                rules_path: vec!["/etc/modsecurity/crs/*.conf".to_string()],
+                rules_remote: None,
+                rules_inline: None,
+            }),
+            ..Default::default()
+        };
 
         let result = config.validate();
         assert!(result.is_ok());
@@ -383,8 +393,10 @@ mod tests {
         let config = ScannerPoolConfig::default();
         assert!(config.validate().is_ok());
 
-        let mut config = ScannerPoolConfig::default();
-        config.timeout_ms = 0;
+        let config = ScannerPoolConfig {
+            timeout_ms: 0,
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
     }
 

@@ -13,12 +13,14 @@ use crate::mock::MockConfig;
 use crate::modsec::ModSecurityConfig;
 use crate::security::SecurityLimits;
 use crate::validation::pool::ValidationPoolConfig;
+use schemars::JsonSchema;
 use serde::Deserialize;
 
 /// Main configuration for the API Fence filter
 ///
 /// This is parsed from JSON provided in the Envoy filter configuration.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(title = "API Fence Configuration")]
 pub struct Config {
     /// API name for metric scoping (required)
     ///
@@ -138,7 +140,8 @@ impl Config {
 }
 
 /// Validation behavior configuration
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[schemars(title = "Validation Configuration")]
 pub struct ValidationConfig {
     /// Whether to validate requests (default: true)
     #[serde(default = "default_true")]
@@ -185,7 +188,8 @@ impl Default for ValidationConfig {
 }
 
 /// Cache configuration for JSON schema validators
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[schemars(title = "Cache Configuration")]
 pub struct CacheConfig {
     /// Maximum number of cached schemas (default: 1000)
     #[serde(default = "default_cache_max_capacity")]

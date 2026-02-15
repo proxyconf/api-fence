@@ -10,11 +10,13 @@
 use crate::error::{MockError, MockResult};
 use crate::resolver::RefResolver;
 use openapiv3::{Operation, ReferenceOr, Response, Schema, StatusCode};
+use schemars::JsonSchema;
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
 
 /// Configuration for mock response generation
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, JsonSchema)]
+#[schemars(title = "Mock Configuration")]
 pub struct MockConfig {
     /// Enable mocking (master switch)
     #[serde(default)]

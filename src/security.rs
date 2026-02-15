@@ -29,6 +29,7 @@
 //! }
 //! ```
 
+use schemars::JsonSchema;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -42,7 +43,8 @@ const MAX_REGEX_INPUT_LENGTH: usize = 65536; // 64KB
 ///
 /// All limits have sensible defaults suitable for most API use cases.
 /// Adjust these based on your specific requirements and threat model.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[schemars(title = "Security Limits")]
 pub struct SecurityLimits {
     /// Maximum URL path length in bytes (default: 2048)
     ///
@@ -523,8 +525,10 @@ mod tests {
 
     #[test]
     fn test_security_limits_validate_path_too_small() {
-        let mut limits = SecurityLimits::default();
-        limits.max_path_length = 10;
+        let limits = SecurityLimits {
+            max_path_length: 10,
+            ..Default::default()
+        };
         let result = limits.validate();
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("max_path_length"));
@@ -532,8 +536,10 @@ mod tests {
 
     #[test]
     fn test_security_limits_validate_json_depth_too_small() {
-        let mut limits = SecurityLimits::default();
-        limits.max_json_depth = 1;
+        let limits = SecurityLimits {
+            max_json_depth: 1,
+            ..Default::default()
+        };
         let result = limits.validate();
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("max_json_depth"));

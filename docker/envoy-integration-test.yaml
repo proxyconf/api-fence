@@ -1,0 +1,130 @@
+# Envoy configuration for Docker-based integration tests.
+#
+# This is a Docker-adapted version of tests/fixtures/envoy/integration-test.yaml.
+# Paths reference the container mounts set up by scripts/envoy-container.sh:
+#   /filter/   - built shared library (+ /filter/lib/ for runtime deps)
+#   /fixtures/ - test fixture files (OpenAPI specs, etc.)
+#
+# Listeners:
+#   Port 18080: OpenAPI validation only (no ModSecurity)
+#   Port 18090: OpenAPI validation + ModSecurity WAF
+#   Port 18081: Admin interface
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 18081
+
+static_resources:
+  listeners:
+    # =========================================================================
+    # Listener 1: Validation-only (no ModSecurity)
+    # =========================================================================
+    - name: validation_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 18080
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: validation_http
+                codec_type: AUTO
+                route_config:
+                  name: validation_route
+                  virtual_hosts:
+                    - name: validation_backend
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          direct_response:
+                            status: 200
+                            body:
+                              inline_string: '{"status": "ok"}'
+                http_filters:
+                  - name: envoy.filters.http.dynamic_modules
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+                      dynamic_module_config:
+                        name: api_fence
+                        do_not_close: true
+                      filter_name: api_fence
+                      filter_config:
+                        "@type": type.googleapis.com/google.protobuf.StringValue
+                        value: |
+                          {
+                            "api_name": "integration_test",
+                            "openapi_spec_path": "/fixtures/openapi/comprehensive.yaml",
+                            "mocking": {
+                              "enabled": true
+                            }
+                          }
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+    # =========================================================================
+    # Listener 2: Validation + ModSecurity WAF
+    # =========================================================================
+    - name: modsec_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 18090
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: modsec_http
+                codec_type: AUTO
+                route_config:
+                  name: modsec_route
+                  virtual_hosts:
+                    - name: modsec_backend
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          direct_response:
+                            status: 200
+                            body:
+                              inline_string: '{"status": "ok"}'
+                http_filters:
+                  - name: envoy.filters.http.dynamic_modules
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+                      dynamic_module_config:
+                        name: api_fence
+                        do_not_close: true
+                      filter_name: api_fence
+                      filter_config:
+                        "@type": type.googleapis.com/google.protobuf.StringValue
+                        value: |
+                          {
+                            "api_name": "modsec_test",
+                            "openapi_spec_path": "/fixtures/openapi/comprehensive.yaml",
+                            "mocking": {
+                              "enabled": true
+                            },
+                            "modsecurity": {
+                              "scan_request": true,
+                              "scan_response": false,
+                              "request_action": "block",
+                              "pool": {
+                                "timeout_ms": 2000
+                              },
+                              "primary_ruleset": {
+                                "name": "bundled_crs",
+                                "use_bundled_crs": true,
+                                "bundled_crs_profile": "minimal"
+                              }
+                            }
+                          }
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

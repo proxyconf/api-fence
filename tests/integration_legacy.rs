@@ -16,6 +16,7 @@ use tempfile::TempDir;
 /// Wrapper for managing an Envoy test server
 pub struct EnvoyTestServer {
     process: Child,
+    #[allow(dead_code)]
     port: u16,
     admin_port: u16,
     _temp_dir: TempDir,
@@ -28,7 +29,7 @@ impl EnvoyTestServer {
         // Ensure the filter is built
         println!("Building API Fence...");
         let build_output = Command::new("cargo")
-            .args(&["build", "--release"])
+            .args(["build", "--release"])
             .output()?;
 
         if !build_output.status.success() {
@@ -201,7 +202,7 @@ mod tests {
             .arg("-s")
             .arg("-w")
             .arg("\n%{http_code}")
-            .arg(&server.url("/"))
+            .arg(server.url("/"))
             .output()
             .expect("Failed to execute curl");
 

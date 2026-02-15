@@ -29,6 +29,7 @@ use crate::config::CacheConfig;
 use crate::schema::{SchemaCache, SchemaCompiler};
 use crate::security::SecurityLimits;
 use openapiv3::Schema;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use std::sync::mpsc::{self, Receiver, Sender, SyncSender};
 use std::sync::{Arc, Mutex};
@@ -36,7 +37,8 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 /// Configuration for the validation thread pool
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[schemars(title = "Validation Pool Configuration")]
 pub struct ValidationPoolConfig {
     /// Whether the pool is enabled (default: false)
     ///
@@ -99,7 +101,7 @@ impl ValidationPoolConfig {
 }
 
 /// Action to take when validation times out
-#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum ValidationTimeoutAction {
     /// Allow the request/response through (log warning)
@@ -218,7 +220,7 @@ impl ValidationResult {
 /// Message sent to worker threads
 enum WorkerMessage {
     /// A job to process
-    Job(ValidationJob),
+    Job(Box<ValidationJob>),
     /// Shutdown signal
     Shutdown,
 }
@@ -332,7 +334,7 @@ impl ValidationPool {
         };
 
         self.job_sender
-            .send(WorkerMessage::Job(job))
+            .send(WorkerMessage::Job(Box::new(job)))
             .map_err(|_| "validation pool has been shut down".to_string())?;
 
         Ok(result_receiver)

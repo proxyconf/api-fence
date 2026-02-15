@@ -44,24 +44,126 @@ description = "Run unit tests only"
 run = "cargo test --lib"
 
 [tasks.test-integration]
-description = "Run integration tests only"
-run = "cargo test --test integration -- --ignored" 
+description = "Run integration tests against Envoy in Docker (set ENVOY_VERSION=stable|dev)"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENVOY_VERSION="${ENVOY_VERSION:-stable}"
+VERSIONS_FILE="envoy-versions.json"
+
+# Resolve Docker image and SDK revision
+DOCKER_IMAGE=$(jq -r ".versions.${ENVOY_VERSION}.docker_image" "$VERSIONS_FILE")
+SDK_REV=$(jq -r ".versions.${ENVOY_VERSION}.sdk_rev // empty" "$VERSIONS_FILE")
+
+if [[ -z "$SDK_REV" ]]; then
+  echo "==> Extracting SDK revision from $DOCKER_IMAGE..."
+  SDK_REV=$(./scripts/get-envoy-sdk-rev.sh "$DOCKER_IMAGE")
+fi
+
+echo "==> Envoy version : $ENVOY_VERSION"
+echo "    Docker image   : $DOCKER_IMAGE"
+echo "    SDK rev        : $SDK_REV"
+
+# Patch Cargo.toml to match the target Envoy SDK
+./scripts/set-envoy-sdk-rev.sh "$SDK_REV"
+
+# Determine build mode
+BUILD_FLAGS=""
+BUILD_MODE="debug"
+if [ "${INTEGRATION_TEST_RELEASE:-}" = "1" ] || [ "${INTEGRATION_TEST_RELEASE:-}" = "true" ]; then
+  BUILD_FLAGS="--release"
+  BUILD_MODE="release"
+fi
+
+# Build the filter inside Docker (Ubuntu 22.04, matching Envoy's base)
+echo "==> Building filter (${BUILD_MODE}) in Docker..."
+./scripts/build-in-docker.sh ${BUILD_FLAGS}
+
+# Stop any previous container, then start Envoy
+./scripts/envoy-container.sh stop
+echo "==> Starting Envoy ($DOCKER_IMAGE)..."
+./scripts/envoy-container.sh start "$DOCKER_IMAGE" "$BUILD_MODE"
+
+# Run integration tests inside Docker (so libmodsecurity is available for linking)
+echo "==> Running integration tests..."
+RESULT=0
+./scripts/test-in-docker.sh --test integration -- --ignored || RESULT=$?
+
+# Cleanup
+echo "==> Stopping Envoy..."
+./scripts/envoy-container.sh stop
+
+exit $RESULT
+'''
 
 [tasks.test-modsec]
-description = "Run ModSecurity WAF integration tests"
+description = "Run ModSecurity WAF integration tests (set ENVOY_VERSION=stable|dev)"
 run = '''
-pkill -9 envoy 2>/dev/null || true
-sleep 1
-SKIP_FILTER_BUILD=1 cargo test --test integration test_modsecurity -- --ignored --test-threads=1
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENVOY_VERSION="${ENVOY_VERSION:-stable}"
+VERSIONS_FILE="envoy-versions.json"
+
+DOCKER_IMAGE=$(jq -r ".versions.${ENVOY_VERSION}.docker_image" "$VERSIONS_FILE")
+SDK_REV=$(jq -r ".versions.${ENVOY_VERSION}.sdk_rev // empty" "$VERSIONS_FILE")
+
+if [[ -z "$SDK_REV" ]]; then
+  SDK_REV=$(./scripts/get-envoy-sdk-rev.sh "$DOCKER_IMAGE")
+fi
+
+./scripts/set-envoy-sdk-rev.sh "$SDK_REV"
+
+echo "==> Building filter in Docker..."
+./scripts/build-in-docker.sh
+
+./scripts/envoy-container.sh stop
+echo "==> Starting Envoy ($DOCKER_IMAGE)..."
+./scripts/envoy-container.sh start "$DOCKER_IMAGE" debug
+
+RESULT=0
+./scripts/test-in-docker.sh --test integration test_modsecurity -- --ignored --test-threads=1 || RESULT=$?
+
+echo "==> Stopping Envoy..."
+./scripts/envoy-container.sh stop
+
+exit $RESULT
 '''
 
 [tasks.test-modsec-verbose]
-description = "Run ModSecurity WAF tests with verbose output"
+description = "Run ModSecurity WAF tests with verbose output (set ENVOY_VERSION=stable|dev)"
 run = '''
-pkill -9 envoy 2>/dev/null || true
-sleep 1
-SKIP_FILTER_BUILD=1 cargo test --test integration test_modsecurity -- --ignored --test-threads=1 --nocapture
-''' 
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENVOY_VERSION="${ENVOY_VERSION:-stable}"
+VERSIONS_FILE="envoy-versions.json"
+
+DOCKER_IMAGE=$(jq -r ".versions.${ENVOY_VERSION}.docker_image" "$VERSIONS_FILE")
+SDK_REV=$(jq -r ".versions.${ENVOY_VERSION}.sdk_rev // empty" "$VERSIONS_FILE")
+
+if [[ -z "$SDK_REV" ]]; then
+  SDK_REV=$(./scripts/get-envoy-sdk-rev.sh "$DOCKER_IMAGE")
+fi
+
+./scripts/set-envoy-sdk-rev.sh "$SDK_REV"
+
+echo "==> Building filter in Docker..."
+./scripts/build-in-docker.sh
+
+./scripts/envoy-container.sh stop
+echo "==> Starting Envoy ($DOCKER_IMAGE)..."
+./scripts/envoy-container.sh start "$DOCKER_IMAGE" debug
+
+RESULT=0
+./scripts/test-in-docker.sh --test integration test_modsecurity -- --ignored --test-threads=1 --nocapture || RESULT=$?
+
+echo "==> Stopping Envoy..."
+./scripts/envoy-container.sh stop
+
+exit $RESULT
+'''
 
 [tasks.check]
 description = "Check code without building"
@@ -107,20 +209,94 @@ depends = ["fmt-check", "clippy", "test"]
 description = "Pre-commit hook checks (fmt, clippy, test)"
 depends = ["fmt", "clippy", "test"]
 
-[tasks.run-envoy]
-description = "Run Envoy with the filter (set ENVOY_CONFIG)"
+[tasks.build-for-envoy]
+description = "Build release artifact for a specific Envoy version (set ENVOY_VERSION=stable|dev)"
 run = '''
-if [ -z "$ENVOY_CONFIG" ]; then
-  echo "Error: ENVOY_CONFIG environment variable not set"
-  echo "Usage: mise run run-envoy ENVOY_CONFIG=path/to/config.yaml"
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENVOY_VERSION="${ENVOY_VERSION:-stable}"
+VERSIONS_FILE="envoy-versions.json"
+
+DOCKER_IMAGE=$(jq -r ".versions.${ENVOY_VERSION}.docker_image" "$VERSIONS_FILE")
+SDK_REV=$(jq -r ".versions.${ENVOY_VERSION}.sdk_rev // empty" "$VERSIONS_FILE")
+
+if [[ -z "$SDK_REV" ]]; then
+  echo "==> Extracting SDK revision from $DOCKER_IMAGE..."
+  SDK_REV=$(./scripts/get-envoy-sdk-rev.sh "$DOCKER_IMAGE")
+fi
+
+echo "==> Building for Envoy $ENVOY_VERSION"
+echo "    Docker image : $DOCKER_IMAGE"
+echo "    SDK rev      : $SDK_REV"
+
+./scripts/set-envoy-sdk-rev.sh "$SDK_REV"
+./scripts/build-in-docker.sh --release
+
+echo "==> Built: target/docker-release/libapi_fence.so"
+'''
+
+[tasks.use-envoy]
+description = "Switch SDK revision to match a specific Envoy version (set ENVOY_VERSION=stable|dev)"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENVOY_VERSION="${ENVOY_VERSION:-stable}"
+VERSIONS_FILE="envoy-versions.json"
+
+if ! jq -e ".versions.${ENVOY_VERSION}" "$VERSIONS_FILE" >/dev/null 2>&1; then
+  echo "ERROR: Unknown version '$ENVOY_VERSION'"
+  echo "Available versions:"
+  jq -r '.versions | keys[]' "$VERSIONS_FILE"
   exit 1
 fi
-envoy -c "$ENVOY_CONFIG" -l debug
+
+DOCKER_IMAGE=$(jq -r ".versions.${ENVOY_VERSION}.docker_image" "$VERSIONS_FILE")
+SDK_REV=$(jq -r ".versions.${ENVOY_VERSION}.sdk_rev // empty" "$VERSIONS_FILE")
+
+if [[ -z "$SDK_REV" ]]; then
+  echo "==> Extracting SDK revision from $DOCKER_IMAGE..."
+  SDK_REV=$(./scripts/get-envoy-sdk-rev.sh "$DOCKER_IMAGE")
+fi
+
+echo "==> Switching to Envoy $ENVOY_VERSION"
+echo "    Docker image : $DOCKER_IMAGE"
+echo "    SDK rev      : $SDK_REV"
+
+./scripts/set-envoy-sdk-rev.sh "$SDK_REV"
+
+echo "==> Done. Run 'cargo build' to rebuild with the new SDK."
+'''
+
+[tasks.run-envoy]
+description = "Run Envoy in Docker with the filter (set ENVOY_VERSION=stable|dev)"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENVOY_VERSION="${ENVOY_VERSION:-stable}"
+VERSIONS_FILE="envoy-versions.json"
+
+DOCKER_IMAGE=$(jq -r ".versions.${ENVOY_VERSION}.docker_image" "$VERSIONS_FILE")
+
+echo "==> Starting Envoy ($DOCKER_IMAGE)..."
+./scripts/envoy-container.sh start "$DOCKER_IMAGE" "${BUILD_MODE:-debug}"
+echo "==> Envoy is running. Press Ctrl-C to stop."
+echo "    Admin:      http://127.0.0.1:18081"
+echo "    Validation: http://127.0.0.1:18080"
+echo "    ModSec:     http://127.0.0.1:18090"
+
+# Wait for Ctrl-C, then clean up
+trap './scripts/envoy-container.sh stop' INT TERM
+docker logs -f api_fence_envoy 2>&1 || true
+./scripts/envoy-container.sh stop
 '''
 
 [tasks.ci]
-description = "CI pipeline (format check, clippy, tests, audit, release build)"
+description = "CI pipeline (format check, clippy, unit tests, audit)"
 run = '''
+#!/usr/bin/env bash
 set -euo pipefail
 
 echo "==> Checking formatting"
@@ -129,26 +305,36 @@ mise run fmt-check
 echo "==> Running clippy"
 mise run clippy
 
-echo "==> Running tests"
-mise run test
+echo "==> Running unit tests"
+mise run test-unit
 
 echo "==> Auditing dependencies"
 mise run audit
 
-echo "==> Building release artifact"
-mise run build
-
-echo "✅ CI completed successfully"
+echo "==> CI checks completed successfully"
 '''
 
 [tasks.info]
 description = "Show development environment info"
 run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
 echo "Envoy OpenAPI Filter Development Environment"
 echo "============================================="
-echo "Rust version: $(rustc --version)"
+echo "Rust version : $(rustc --version)"
 echo "Cargo version: $(cargo --version)"
-echo "Envoy version: $(envoy --version 2>&1 | head -n1 || echo 'envoy not found')"
+echo ""
+echo "Current SDK revision:"
+grep '^envoy-proxy-dynamic-modules-rust-sdk' Cargo.toml 2>/dev/null \
+  || grep 'envoy-proxy-dynamic-modules-rust-sdk' Cargo.toml | grep -v '^#' | head -1
+echo ""
+echo "Available Envoy versions:"
+if [[ -f envoy-versions.json ]]; then
+  jq -r '.versions | to_entries[] | "  \(.key): \(.value.docker_image) (sdk_rev: \(.value.sdk_rev // "dynamic"))"' envoy-versions.json
+else
+  echo "  (envoy-versions.json not found)"
+fi
 echo ""
 echo "Available tasks: mise tasks"
 '''

@@ -600,7 +600,7 @@ impl OpenApiFilter {
                     };
 
                     // Validate using thread pool if enabled, otherwise use direct validation
-                    if let Some(ref pool) = self.validation_pool {
+                    if let Some(pool) = self.validation_pool {
                         // Use thread pool for validation
                         let result = pool.validate_blocking(
                             ValidationJobType::RequestBody,
@@ -730,7 +730,7 @@ impl OpenApiFilter {
                     .map_err(|e| format!("Failed to resolve schema reference: {}", e))?;
 
                 // Validate using thread pool if enabled, otherwise use direct validation
-                if let Some(ref pool) = self.validation_pool {
+                if let Some(pool) = self.validation_pool {
                     // Use thread pool for validation
                     let result = pool.validate_blocking(
                         ValidationJobType::ResponseBody,

@@ -1,0 +1,5 @@
+# Avoid sending multi-GB build context to Docker daemon.
+# The builder image only needs the Dockerfile; source is mounted at runtime.
+target/
+.cargo/
+.git/

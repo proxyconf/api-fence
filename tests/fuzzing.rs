@@ -108,11 +108,12 @@ fn list_findings(results_dir: &PathBuf) {
     }
 
     println!("\n=== Findings ===");
-    for entry in fs::read_dir(results_dir).expect("Failed to read results directory") {
-        if let Ok(entry) = entry {
-            if entry.path().extension().and_then(|s| s.to_str()) == Some("json") {
-                println!("  - {}", entry.file_name().to_string_lossy());
-            }
+    for entry in fs::read_dir(results_dir)
+        .expect("Failed to read results directory")
+        .flatten()
+    {
+        if entry.path().extension().and_then(|s| s.to_str()) == Some("json") {
+            println!("  - {}", entry.file_name().to_string_lossy());
         }
     }
 }

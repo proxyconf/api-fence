@@ -5,7 +5,9 @@
 
 use crate::error::ValidationError;
 use crate::security::{self, SecurityLimits};
-use crate::util::{extract_media_type, extract_multipart_boundary, is_json_media_type, media_type_matches};
+use crate::util::{
+    extract_media_type, extract_multipart_boundary, is_json_media_type, media_type_matches,
+};
 
 /// Parse application/x-www-form-urlencoded to JSON
 pub fn parse_form_urlencoded_to_json(body: &[u8]) -> Result<serde_json::Value, String> {
@@ -27,10 +29,8 @@ pub fn parse_form_urlencoded_to_json(body: &[u8]) -> Result<serde_json::Value, S
                 }
                 _ => {
                     let old_value = existing.clone();
-                    *existing = serde_json::Value::Array(vec![
-                        old_value,
-                        serde_json::Value::String(value),
-                    ]);
+                    *existing =
+                        serde_json::Value::Array(vec![old_value, serde_json::Value::String(value)]);
                 }
             }
         } else {
@@ -65,14 +65,12 @@ pub fn coerce_form_data_to_schema(
                             // Reference - can't resolve here, keep as is
                             val.clone()
                         }
-                    } else if let Some(additional) = &obj.additional_properties {
+                    } else if let Some(openapiv3::AdditionalProperties::Schema(schema_ref)) =
+                        &obj.additional_properties
+                    {
                         // Try additional properties schema
-                        if let openapiv3::AdditionalProperties::Schema(schema_ref) = additional {
-                            if let openapiv3::ReferenceOr::Item(add_schema) = schema_ref.as_ref() {
-                                coerce_form_data_to_schema(val, add_schema)?
-                            } else {
-                                val.clone()
-                            }
+                        if let openapiv3::ReferenceOr::Item(add_schema) = schema_ref.as_ref() {
+                            coerce_form_data_to_schema(val, add_schema)?
                         } else {
                             val.clone()
                         }
@@ -244,8 +242,7 @@ pub fn parse_multipart_to_json(body: &[u8], boundary: &str) -> Result<serde_json
 
 /// Parse XML to JSON using serde-xml-rs
 pub fn parse_xml_to_json(body: &[u8]) -> Result<serde_json::Value, String> {
-    let body_str =
-        std::str::from_utf8(body).map_err(|e| format!("Invalid UTF-8 in XML: {}", e))?;
+    let body_str = std::str::from_utf8(body).map_err(|e| format!("Invalid UTF-8 in XML: {}", e))?;
 
     // Parse XML to serde_json::Value
     let xml_value: serde_json::Value =
@@ -332,8 +329,8 @@ pub fn find_matching_content_type<'a, T>(
     request_content_type: &str,
 ) -> Result<(&'a str, &'a T), ValidationError> {
     // Parse request content type
-    let request_media = extract_media_type(request_content_type)
-        .ok_or_else(|| ValidationError::InvalidBody {
+    let request_media =
+        extract_media_type(request_content_type).ok_or_else(|| ValidationError::InvalidBody {
             content_type: request_content_type.to_string(),
             message: "Invalid content-type format".to_string(),
         })?;
@@ -368,7 +365,7 @@ mod tests {
         let body = b"name=John&age=30";
         let result = parse_form_urlencoded_to_json(body);
         assert!(result.is_ok());
-        
+
         let json = result.unwrap();
         assert_eq!(json["name"], "John");
         assert_eq!(json["age"], "30");
@@ -379,7 +376,7 @@ mod tests {
         let body = b"tags=a&tags=b&tags=c";
         let result = parse_form_urlencoded_to_json(body);
         assert!(result.is_ok());
-        
+
         let json = result.unwrap();
         assert!(json["tags"].is_array());
         assert_eq!(json["tags"].as_array().unwrap().len(), 3);
@@ -390,7 +387,7 @@ mod tests {
         let body = b"";
         let result = parse_form_urlencoded_to_json(body);
         assert!(result.is_ok());
-        
+
         let json = result.unwrap();
         assert!(json.as_object().unwrap().is_empty());
     }
@@ -489,18 +486,26 @@ mod tests {
     fn test_json_invalid_syntax() {
         // Test various invalid JSON syntaxes
         let invalid_jsons = [
-            br#"{"name": "John""#.as_slice(),    // Missing closing brace
-            br#"{"name": }"#.as_slice(),         // Missing value
-            br#"name: "John"}"#.as_slice(),      // Not JSON (YAML-like)
-            br#"["a", "b",]"#.as_slice(),        // Trailing comma
-            br#"undefined"#.as_slice(),          // JavaScript undefined
+            br#"{"name": "John""#.as_slice(), // Missing closing brace
+            br#"{"name": }"#.as_slice(),      // Missing value
+            br#"name: "John"}"#.as_slice(),   // Not JSON (YAML-like)
+            br#"["a", "b",]"#.as_slice(),     // Trailing comma
+            br#"undefined"#.as_slice(),       // JavaScript undefined
         ];
 
         for invalid_json in invalid_jsons {
             let result = body_to_json(invalid_json, "application/json");
-            assert!(result.is_err(), "Should fail for: {:?}", std::str::from_utf8(invalid_json));
+            assert!(
+                result.is_err(),
+                "Should fail for: {:?}",
+                std::str::from_utf8(invalid_json)
+            );
             let err_msg = result.unwrap_err();
-            assert!(err_msg.contains("Invalid JSON"), "Error should mention JSON: {}", err_msg);
+            assert!(
+                err_msg.contains("Invalid JSON"),
+                "Error should mention JSON: {}",
+                err_msg
+            );
         }
     }
 
@@ -508,19 +513,22 @@ mod tests {
     fn test_multipart_simple() {
         // Simple multipart form with text fields
         let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
-        let body = format!(
-            "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n\
+        let body = "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n\
              Content-Disposition: form-data; name=\"field1\"\r\n\r\n\
              value1\r\n\
              ------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n\
              Content-Disposition: form-data; name=\"field2\"\r\n\r\n\
              value2\r\n\
              ------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n"
-        );
+            .to_string();
 
         let result = parse_multipart_to_json(body.as_bytes(), boundary);
-        assert!(result.is_ok(), "Multipart parsing failed: {:?}", result.err());
-        
+        assert!(
+            result.is_ok(),
+            "Multipart parsing failed: {:?}",
+            result.err()
+        );
+
         let json = result.unwrap();
         assert_eq!(json["field1"], "value1");
         assert_eq!(json["field2"], "value2");
@@ -532,7 +540,7 @@ mod tests {
         let body = b"";
         let result = body_to_json(body, "application/json");
         assert!(result.is_err());
-        
+
         // Whitespace-only body should also fail
         let body = b"   ";
         let result = body_to_json(body, "application/json");
@@ -543,7 +551,7 @@ mod tests {
     fn test_vendored_json_content_type() {
         // Test that vendored JSON content types work (e.g., application/vnd.api+json)
         let body = br#"{"data": {"type": "user", "id": "1"}}"#;
-        
+
         // application/vnd.api+json (JSON:API spec)
         let result = body_to_json(body, "application/vnd.api+json");
         assert!(result.is_ok(), "Should accept application/vnd.api+json");

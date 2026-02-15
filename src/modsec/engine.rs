@@ -100,11 +100,6 @@ impl LogCollector {
     pub fn logs(&self) -> &[String] {
         &self.logs
     }
-
-    /// Take ownership of matched rules, clearing the collector
-    pub fn take_matched_rules(&mut self) -> Vec<(u32, String)> {
-        std::mem::take(&mut self.matched_rules)
-    }
 }
 
 /// Safe wrapper around the ModSecurity engine

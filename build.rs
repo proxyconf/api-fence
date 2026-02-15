@@ -66,6 +66,43 @@ const REQUEST_RULES: &[&str] = &[
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
+    // =========================================================================
+    // libmodsecurity static linking
+    // =========================================================================
+    // When building in Docker (scripts/build-in-docker.sh), libmodsecurity is
+    // installed at /opt/modsecurity as a static library. Tell the linker where
+    // to find it and what to link.
+    //
+    // For local development (cargo test on host), fall back to dynamic linking
+    // if the static lib isn't found.
+    let modsec_static_dir = Path::new("/opt/modsecurity/lib");
+    if modsec_static_dir.exists() {
+        // Static link path (Docker builder)
+        println!(
+            "cargo:rustc-link-search=native={}",
+            modsec_static_dir.display()
+        );
+        println!("cargo:rustc-link-lib=static=modsecurity");
+
+        // libmodsecurity is C++ — link the C++ standard library
+        println!("cargo:rustc-link-lib=dylib=stdc++");
+
+        // Dependencies of our libmodsecurity build (configured --without many optionals):
+        //   Required: pcre2, yajl, xml2
+        //   Bundled:  libinjection, mbedtls (compiled into libmodsecurity.a)
+        println!("cargo:rustc-link-lib=dylib=pcre2-8");
+        println!("cargo:rustc-link-lib=dylib=yajl");
+        println!("cargo:rustc-link-lib=dylib=xml2");
+
+        // System libs that libmodsecurity needs
+        println!("cargo:rustc-link-lib=dylib=pthread");
+        println!("cargo:rustc-link-lib=dylib=dl");
+        println!("cargo:rustc-link-lib=dylib=m");
+    } else {
+        // Dynamic link path (local development / host builds)
+        println!("cargo:rustc-link-lib=dylib=modsecurity");
+    }
+
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR not set"));
     let crs_dir = out_dir.join("crs");
 

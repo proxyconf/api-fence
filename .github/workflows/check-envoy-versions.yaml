@@ -1,0 +1,86 @@
+name: check-envoy-versions
+
+# Periodically check whether the Envoy Docker images have been updated.
+# If the SDK revision extracted from a Docker image differs from what is
+# recorded in envoy-versions.json, this workflow opens a pull request
+# with the updated configuration.
+
+on:
+  schedule:
+    # Run daily at 06:00 UTC
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for Envoy version updates
+        id: check
+        run: |
+          VERSIONS_FILE="envoy-versions.json"
+          UPDATED="false"
+
+          for VERSION_KEY in $(jq -r '.versions | keys[]' "$VERSIONS_FILE"); do
+            DOCKER_IMAGE=$(jq -r ".versions.${VERSION_KEY}.docker_image" "$VERSIONS_FILE")
+            RECORDED_REV=$(jq -r ".versions.${VERSION_KEY}.sdk_rev // empty" "$VERSIONS_FILE")
+
+            echo "Checking $VERSION_KEY ($DOCKER_IMAGE)..."
+
+            # Pull the latest image
+            docker pull "$DOCKER_IMAGE" >/dev/null 2>&1
+
+            # Extract current revision
+            VERSION_OUTPUT=$(docker run --rm "$DOCKER_IMAGE" envoy --version 2>/dev/null)
+            CURRENT_REV=$(echo "$VERSION_OUTPUT" | sed -n 's/.*version: \([a-f0-9]\{40\}\).*/\1/p')
+            CURRENT_SEMVER=$(echo "$VERSION_OUTPUT" | sed -n 's|.*version: [a-f0-9]\{40\}/\([^/]*\)/.*|\1|p')
+
+            if [[ -z "$CURRENT_REV" ]]; then
+              echo "  WARNING: Could not extract revision from $DOCKER_IMAGE"
+              continue
+            fi
+
+            echo "  Recorded : ${RECORDED_REV:-<dynamic>}"
+            echo "  Current  : $CURRENT_REV ($CURRENT_SEMVER)"
+
+            if [[ "$CURRENT_REV" != "$RECORDED_REV" ]]; then
+              echo "  => UPDATE NEEDED"
+              UPDATED="true"
+
+              # Update envoy-versions.json
+              jq ".versions.${VERSION_KEY}.sdk_rev = \"$CURRENT_REV\"" "$VERSIONS_FILE" > tmp.json \
+                && mv tmp.json "$VERSIONS_FILE"
+
+              # Update envoy_version if we could extract it
+              if [[ -n "$CURRENT_SEMVER" ]]; then
+                jq ".versions.${VERSION_KEY}.envoy_version = \"$CURRENT_SEMVER\"" "$VERSIONS_FILE" > tmp.json \
+                  && mv tmp.json "$VERSIONS_FILE"
+              fi
+            else
+              echo "  => up to date"
+            fi
+          done
+
+          echo "updated=$UPDATED" >> "$GITHUB_OUTPUT"
+
+      - name: Create pull request
+        if: steps.check.outputs.updated == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore: update Envoy SDK revisions from Docker images"
+          title: "chore: update Envoy SDK revisions"
+          body: |
+            Automated update of `envoy-versions.json` based on the latest
+            Envoy Docker images.
+
+            This PR was created by the `check-envoy-versions` workflow.
+            Please review the version changes and ensure CI passes before merging.
+          branch: chore/update-envoy-versions
+          delete-branch: true
+          labels: dependencies,automated

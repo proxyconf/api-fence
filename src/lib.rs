@@ -31,7 +31,9 @@ pub mod validation;
 
 // Re-export main public types
 pub use config::{CacheConfig, Config, ValidationConfig};
-pub use error::{ConfigError, FilterError, MockError, ProblemDetails, RoutingError, SchemaError, ValidationError};
+pub use error::{
+    ConfigError, FilterError, MockError, ProblemDetails, RoutingError, SchemaError, ValidationError,
+};
 pub use filter::{FilterConfig, OpenApiFilter};
 pub use resolver::{RefError, RefResolver, RefTarget};
 pub use router::Router;

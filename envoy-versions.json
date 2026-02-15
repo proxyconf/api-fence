@@ -1,0 +1,15 @@
+{
+  "versions": {
+    "stable": {
+      "docker_image": "envoyproxy/envoy:v1.37-latest",
+      "envoy_version": "1.37.0",
+      "sdk_rev": "3909deb175ef358202d6ab4f94d683ffc0fdb477"
+    },
+    "dev": {
+      "docker_image": "envoyproxy/envoy:tools-dev",
+      "envoy_version": null,
+      "sdk_rev": null
+    }
+  },
+  "default": "stable"
+}
