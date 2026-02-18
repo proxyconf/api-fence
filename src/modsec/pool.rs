@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Thread pool for ModSecurity scanning
 //!
 //! This module provides a thread pool for executing ModSecurity scans

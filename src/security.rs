@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Security controls for the OpenAPI filter
 //!
 //! This module provides security hardening features including:

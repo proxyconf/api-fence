@@ -1,11 +1,3 @@
-# Advanced Envoy configuration example showing all API Fence features
-# This configuration demonstrates:
-# - Request and response validation
-# - Cache configuration
-# - Validation error behavior (pass-through mode)
-# - Access logging with validation metadata
-# - Metrics collection
-
 admin:
   address:
     socket_address:
@@ -50,24 +42,31 @@ static_resources:
                         # Filter-specific configuration as JSON string
                         value: |
                           {
-                            "api_name": "advanced_api",
+                            "api_name": "sample_api",
                             "openapi_spec_path": "./examples/sample-openapi.yaml",
                             "cache": {
-                              "max_capacity": 500,
-                              "ttl_seconds": 7200
+                              "max_capacity": 1000,
+                              "ttl_seconds": 3600
                             },
                             "validation": {
                               "validate_request": true,
-                              "validate_response": true,
-                              "fail_on_request_error": false,
+                              "validate_response": false,
+                              "fail_on_request_error": true,
                               "fail_on_response_error": false
+                            },
+                            "modsecurity": {
+                              "scan_request": true,
+                              "primary_ruleset": {
+                                "name": "new",
+                                "use_bundled_crs": true
+                              }
                             }
                           }
                   # Router filter (required)
                   - name: envoy.filters.http.router
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-                # Access logging with detailed validation metadata
+                # Access logging configuration with detailed validation and WAF metadata
                 # Formatted for easy terminal viewing
                 access_log:
                   - name: envoy.access_loggers.file
@@ -89,6 +88,16 @@ static_resources:
                             │  └─ %DYNAMIC_METADATA(api_fence:request.errors)%
                             └─ Response: %DYNAMIC_METADATA(api_fence:response.verdict)% (errors: %DYNAMIC_METADATA(api_fence:response.error_count)%)
                                └─ %DYNAMIC_METADATA(api_fence:response.errors)%
+                            ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+                            🛡️  MODSECURITY WAF
+                            ├─ Request:  %DYNAMIC_METADATA(api_fence:modsec.request.verdict)% | Ruleset: %DYNAMIC_METADATA(api_fence:modsec.request.ruleset)%
+                            │  ├─ Scan Time: %DYNAMIC_METADATA(api_fence:modsec.request.scan_time_ms)%ms | Timeout: %DYNAMIC_METADATA(api_fence:modsec.request.timed_out)%
+                            │  ├─ Matched Rules: %DYNAMIC_METADATA(api_fence:modsec.request.matched_rules)%
+                            │  └─ Messages: %DYNAMIC_METADATA(api_fence:modsec.request.matched_messages)%
+                            └─ Response: %DYNAMIC_METADATA(api_fence:modsec.response.verdict)% | Ruleset: %DYNAMIC_METADATA(api_fence:modsec.response.ruleset)%
+                               ├─ Scan Time: %DYNAMIC_METADATA(api_fence:modsec.response.scan_time_ms)%ms | Timeout: %DYNAMIC_METADATA(api_fence:modsec.response.timed_out)%
+                               ├─ Matched Rules: %DYNAMIC_METADATA(api_fence:modsec.response.matched_rules)%
+                               └─ Messages: %DYNAMIC_METADATA(api_fence:modsec.response.matched_messages)%
                             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   clusters:
@@ -105,11 +114,3 @@ static_resources:
                     socket_address:
                       address: 127.0.0.1
                       port_value: 8080
-
-# Metrics available at http://localhost:9901/stats/prometheus
-# All metrics are scoped under the configured api_name ("advanced_api" in this example):
-# - api_fence.advanced_api.cache.hits
-# - api_fence.advanced_api.cache.misses
-# - api_fence.advanced_api.schema.compile_time_ms (histogram)
-# - api_fence.advanced_api.request.validation_errors
-# - api_fence.advanced_api.response.validation_errors

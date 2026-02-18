@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Path parameter validation
 //!
 //! This module handles validation of path parameters extracted from the URL.

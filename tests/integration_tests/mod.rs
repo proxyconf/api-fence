@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Integration test modules for OpenAPI Filter
 //!
 //! This module provides shared infrastructure for integration testing

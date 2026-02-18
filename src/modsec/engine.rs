@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! ModSecurity engine wrapper
 //!
 //! This module provides a safe wrapper around the libmodsecurity engine.

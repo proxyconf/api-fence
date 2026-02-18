@@ -2,6 +2,10 @@
 
 Get up and running with API Fence in minutes.
 
+**API Fence** is an HTTP filter for Envoy Proxy that provides:
+- **OpenAPI Validation**: Validate HTTP requests/responses against OpenAPI 3.x specifications
+- **ModSecurity WAF**: Web Application Firewall protection with bundled OWASP CoreRuleSet v4.0.0
+
 ## Prerequisites
 
 1. **Mise** (https://mise.jdx.dev/)
@@ -88,7 +92,8 @@ cargo test -- --nocapture
 mise run test-integration
 
 # Run ModSecurity WAF tests
-mise run test-modsec-verbose
+mise run test-modsec
+mise run test-modsec-verbose  # With detailed output
 ```
 
 ### 4. Run Code Checks
@@ -147,13 +152,14 @@ mise run quality        # Run all checks
    - [TESTING.md](./TESTING.md) - Testing strategy
 
 2. **Explore the code**
-   - `src/lib.rs` - Main filter implementation
+   - `src/lib.rs` - Main filter and OpenAPI validation
    - `src/modsec/` - ModSecurity WAF integration
-   - `examples/` - Example configurations
+   - `examples/` - Example Envoy configurations
 
 3. **Start developing**
-   - Implement new validation logic
-   - Write tests
+   - Implement new OpenAPI validation features
+   - Configure ModSecurity WAF rules
+   - Write unit and integration tests
    - Run integration tests with Envoy
 
 ## Common Commands
@@ -242,10 +248,11 @@ The project includes configurations for:
 
 Now that you have the environment set up, you can:
 
-1. **Implement new filter features** in `src/lib.rs`
-2. **Add WAF rules** via ModSecurity configuration
-3. **Write unit tests** for validation logic
-4. **Create integration tests** with Envoy
-5. **Profile performance** for optimization
+1. **Configure OpenAPI validation** - Add your OpenAPI specs to validate API requests
+2. **Enable ModSecurity WAF** - Use bundled OWASP CoreRuleSet or custom rules
+3. **Implement new features** - Extend validation logic in `src/lib.rs` or WAF in `src/modsec/`
+4. **Write tests** - Add unit tests for new validation logic
+5. **Test with Envoy** - Run integration tests with real Envoy instances
+6. **Optimize performance** - Profile and tune for your workload
 
 Happy coding!

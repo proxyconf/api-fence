@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Path routing for OpenAPI operations
 //!
 //! This module handles efficient path matching using the matchit router,

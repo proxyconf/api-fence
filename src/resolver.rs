@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! OpenAPI $ref resolution
 //!
 //! This module handles resolution of `$ref` references in OpenAPI specifications,

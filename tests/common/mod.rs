@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Shared test fixtures and helpers for integration and unit tests
 //!
 //! This module provides reusable test utilities for creating OpenAPI specs,

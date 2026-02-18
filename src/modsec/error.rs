@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! ModSecurity error types
 //!
 //! This module defines error types for all ModSecurity operations.

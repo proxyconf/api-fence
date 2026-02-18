@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! JSON string extraction optimization
 //!
 //! This module extracts unique string values from JSON payloads

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! OpenAPI Fuzzing integration tests
 //!
 //! This test uses openapi-fuzzer to test the OpenAPI filter with Envoy

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Envoy readiness utilities for integration tests
 //!
 //! The Envoy process lifecycle (start/stop) is managed externally by

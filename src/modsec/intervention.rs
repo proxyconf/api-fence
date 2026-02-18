@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! ModSecurity intervention types
 //!
 //! When ModSecurity rules match and trigger disruptive actions,

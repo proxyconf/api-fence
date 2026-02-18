@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Body validation
 //!
 //! This module handles validation of HTTP request and response bodies,

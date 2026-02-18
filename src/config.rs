@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Configuration types for the API Fence filter
 //!
 //! This module contains all configuration-related types including:

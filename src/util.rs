@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Utility functions for the API Fence filter
 //!
 //! This module contains pure utility functions that are shared across the filter.

@@ -1,7 +1,13 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Envoy API Fence - Dynamic Module
 //!
 //! This is an Envoy HTTP filter implemented as a dynamic module using Rust.
-//! It validates incoming HTTP requests against an OpenAPI specification.
+//! It provides dual protection layers:
+//! 
+//! 1. **OpenAPI Validation**: Validates incoming HTTP requests/responses against OpenAPI 3.x specifications
+//! 2. **ModSecurity WAF**: Web Application Firewall protection using libmodsecurity3 with OWASP CoreRuleSet v4.0.0
 //!
 //! # Module Structure
 //!
@@ -9,6 +15,7 @@
 //! - [`error`]: Error types and result aliases
 //! - [`filter`]: Main filter implementation
 //! - [`mock`]: Mock response generation
+//! - [`modsec`]: ModSecurity WAF integration
 //! - [`observability`]: Metrics and dynamic metadata
 //! - [`router`]: OpenAPI path routing
 //! - [`schema`]: JSON Schema caching and compilation

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! OpenAPI Filter implementation
 //!
 //! This module contains the main filter implementation including:

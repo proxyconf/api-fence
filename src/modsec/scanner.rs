@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Dual ruleset scanner
 //!
 //! This module provides support for running two rulesets (OLD/NEW)

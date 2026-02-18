@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Mock response generation module
 //!
 //! This module handles generating mock responses for API testing.

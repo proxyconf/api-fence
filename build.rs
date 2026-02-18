@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Build script for api_fence
 //!
 //! Downloads OWASP CoreRuleSet (CRS) v4.0.0 during build time
@@ -70,31 +73,62 @@ fn main() {
     // libmodsecurity static linking
     // =========================================================================
     // When building in Docker (scripts/build-in-docker.sh), libmodsecurity is
-    // installed at /opt/modsecurity as a static library. Tell the linker where
-    // to find it and what to link.
+    // installed at /opt/modsecurity as a static library. All dependencies
+    // (pcre2, yajl, libxml2, zlib) are also built as static libraries at
+    // /opt/static.
     //
     // For local development (cargo test on host), fall back to dynamic linking
     // if the static lib isn't found.
     let modsec_static_dir = Path::new("/opt/modsecurity/lib");
-    if modsec_static_dir.exists() {
-        // Static link path (Docker builder)
+    let static_libs_dir = Path::new("/opt/static/lib");
+
+    if modsec_static_dir.exists() && static_libs_dir.exists() {
+        // Static link path (Docker builder) - all dependencies bundled
+        println!(
+            "cargo:rustc-link-search=native={}",
+            modsec_static_dir.display()
+        );
+        println!(
+            "cargo:rustc-link-search=native={}",
+            static_libs_dir.display()
+        );
+
+        // Link libmodsecurity statically
+        println!("cargo:rustc-link-lib=static=modsecurity");
+
+        // Link all dependencies statically
+        // Note: yajl's static library is named libyajl_s.a but we create a symlink
+        // to libyajl.a in the Dockerfile for compatibility
+        println!("cargo:rustc-link-lib=static=pcre2-8");
+        println!("cargo:rustc-link-lib=static=yajl");
+        println!("cargo:rustc-link-lib=static=xml2");
+        println!("cargo:rustc-link-lib=static=z");
+
+        // libmodsecurity is C++ — link the C++ standard library dynamically.
+        // We keep libstdc++ dynamic because:
+        // 1. It's part of the base system on virtually all Linux distributions
+        // 2. Static linking libstdc++ in a shared library can cause issues
+        //    if the host application also uses C++ (ODR violations, etc.)
+        // 3. Envoy itself is C++ and links against libstdc++
+        println!("cargo:rustc-link-lib=dylib=stdc++");
+
+        // System libs that libmodsecurity needs (these are always dynamic as
+        // they're part of the base system and provided by glibc)
+        println!("cargo:rustc-link-lib=dylib=pthread");
+        println!("cargo:rustc-link-lib=dylib=dl");
+        println!("cargo:rustc-link-lib=dylib=m");
+    } else if modsec_static_dir.exists() {
+        // Partial static path - libmodsecurity static, deps dynamic
+        // (fallback for older builder images)
         println!(
             "cargo:rustc-link-search=native={}",
             modsec_static_dir.display()
         );
         println!("cargo:rustc-link-lib=static=modsecurity");
-
-        // libmodsecurity is C++ — link the C++ standard library
         println!("cargo:rustc-link-lib=dylib=stdc++");
-
-        // Dependencies of our libmodsecurity build (configured --without many optionals):
-        //   Required: pcre2, yajl, xml2
-        //   Bundled:  libinjection, mbedtls (compiled into libmodsecurity.a)
         println!("cargo:rustc-link-lib=dylib=pcre2-8");
         println!("cargo:rustc-link-lib=dylib=yajl");
         println!("cargo:rustc-link-lib=dylib=xml2");
-
-        // System libs that libmodsecurity needs
         println!("cargo:rustc-link-lib=dylib=pthread");
         println!("cargo:rustc-link-lib=dylib=dl");
         println!("cargo:rustc-link-lib=dylib=m");

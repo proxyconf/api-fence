@@ -2,7 +2,7 @@
 name = "api_fence"
 version = "0.1.0"
 edition = "2021"
-license = "Apache-2.0"
+license = "MPL-2.0"
 authors = ["Your Name <your.email@example.com>"]
 
 [lib]
@@ -17,7 +17,8 @@ path = "src/bin/export-schema.rs"
 [dependencies]
 # Envoy dynamic modules SDK - must match Envoy version.
 # Use `mise run use-envoy ENVOY_VERSION=stable|dev` to switch revisions.
-envoy-proxy-dynamic-modules-rust-sdk = { git = "https://github.com/envoyproxy/envoy", rev = "3909deb175ef358202d6ab4f94d683ffc0fdb477" }
+#envoy-proxy-dynamic-modules-rust-sdk = { git = "https://github.com/envoyproxy/envoy", rev = "3909deb175ef358202d6ab4f94d683ffc0fdb477" }
+envoy-proxy-dynamic-modules-rust-sdk = { git = "https://github.com/envoyproxy/envoy", rev = "c9cd0f5d4a70d68a8a1fbbc3f48cf1e028f33ad8" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 # OpenAPI parsing and validation

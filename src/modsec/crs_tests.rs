@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Phase 1: Deterministic unit-style ModSecurity + CRS tests
 //!
 //! These tests exercise bundled CRS rules directly through the libmodsecurity

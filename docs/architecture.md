@@ -2,7 +2,13 @@
 
 ## Overview
 
-This document describes the modular architecture for the Envoy API Fence - a high-performance, Envoy-native API request and response validation system. The architecture is designed to support banking, insurance, and cloud environments where correctness, auditability, and throughput are non-negotiable.
+This document describes the modular architecture for the Envoy API Fence - a high-performance, Envoy-native API request and response validation and security system. 
+
+**API Fence** provides dual protection layers:
+1. **OpenAPI Validation**: Ensures API requests/responses conform to OpenAPI 3.x specifications
+2. **ModSecurity WAF**: Protects against common web attacks (SQLi, XSS, RCE, etc.) using OWASP CoreRuleSet v4.0.0
+
+The architecture is designed to support banking, insurance, and cloud environments where correctness, security, auditability, and throughput are non-negotiable.
 
 ---
 
@@ -42,30 +48,45 @@ This document describes the modular architecture for the Envoy API Fence - a hig
     ||  +----------------+     +-------+--------+     +----------------+    ||
     ||                                 |                                    ||
     ||                                 v                                    ||
-    ||  +--------------------------------------------------------------+   ||
-    ||  |                    VALIDATION PIPELINE                        |   ||
-    ||  |                                                               |   ||
-    ||  |  on_request_headers()                                         |   ||
-    ||  |  +----------+  +----------+  +----------+  +----------+       |   ||
-    ||  |  | Route    |->| Path     |->| Query    |->| Header   |       |   ||
-    ||  |  | Match    |  | Params   |  | Params   |  | Validate |       |   ||
-    ||  |  +----------+  +----------+  +----------+  +----------+       |   ||
-    ||  |                                                               |   ||
-    ||  |  on_request_body()                                            |   ||
-    ||  |  +----------+  +----------+  +----------+                     |   ||
-    ||  |  | Buffer   |->| Parse    |->| Schema   |                     |   ||
-    ||  |  | Body     |  | Content  |  | Validate |                     |   ||
-    ||  |  +----------+  +----------+  +----------+                     |   ||
-    ||  |       |                           |                           |   ||
-    ||  |       v                           v                           |   ||
-    ||  |  +----------+              +----------+                       |   ||
-    ||  |  | Mock Gen |              | Forward  |                       |   ||
-    ||  |  | (if on)  |              | Request  |                       |   ||
-    ||  |  +----------+              +----------+                       |   ||
-    ||  +--------------------------------------------------------------+   ||
-    ||                                 |                                    ||
-    ||                                 v                                    ||
-    ||  +--------------------------------------------------------------+   ||
+     ||  +--------------------------------------------------------------+   ||
+     ||  |                    VALIDATION PIPELINE                        |   ||
+     ||  |                                                               |   ||
+     ||  |  on_request_headers()                                         |   ||
+     ||  |  +----------+  +----------+  +----------+  +----------+       |   ||
+     ||  |  | Route    |->| Path     |->| Query    |->| Header   |       |   ||
+     ||  |  | Match    |  | Params   |  | Params   |  | Validate |       |   ||
+     ||  |  +----------+  +----------+  +----------+  +----------+       |   ||
+     ||  |                                                               |   ||
+     ||  |  on_request_body()                                            |   ||
+     ||  |  +----------+  +----------+  +----------+                     |   ||
+     ||  |  | Buffer   |->| Parse    |->| Schema   |                     |   ||
+     ||  |  | Body     |  | Content  |  | Validate |                     |   ||
+     ||  |  +----------+  +----------+  +----------+                     |   ||
+     ||  |       |                           |                           |   ||
+     ||  |       v                           v                           |   ||
+     ||  |  +----------+              +----------+                       |   ||
+     ||  |  | Mock Gen |              | Forward  |                       |   ||
+     ||  |  | (if on)  |              | Request  |                       |   ||
+     ||  |  +----------+              +----------+                       |   ||
+     ||  +--------------------------------------------------------------+   ||
+     ||                                 |                                    ||
+     ||                                 v                                    ||
+     ||  +--------------------------------------------------------------+   ||
+     ||  |                    MODSECURITY WAF SCAN                       |   ||
+     ||  |                      (async thread pool)                      |   ||
+     ||  |                                                               |   ||
+     ||  |  +----------+  +----------+  +----------+  +----------+       |   ||
+     ||  |  | Extract  |->| Scan     |->| Verdict  |->| Block or |       |   ||
+     ||  |  | Strings  |  | Rules    |  | (OWASP)  |  | Allow    |       |   ||
+     ||  |  +----------+  +----------+  +----------+  +----------+       |   ||
+     ||  |                                                               |   ||
+     ||  |  Scans: Headers, Query, Path, Body (JSON strings extracted)  |   ||
+     ||  |  Rules: Bundled CRS v4.0.0 or custom (inline/file/URL)       |   ||
+     ||  |  Action: Block (403) or Alert (log + continue)               |   ||
+     ||  +--------------------------------------------------------------+   ||
+     ||                                 |                                    ||
+     ||                                 v                                    ||
+     ||  +--------------------------------------------------------------+   ||
     ||  |                 RESPONSE VALIDATION (optional)                |   ||
     ||  |                                                               |   ||
     ||  |  on_response_headers()       on_response_body()               |   ||
@@ -198,22 +219,85 @@ matchit:  /users/:userId/orders/:orderId
 
 **Metrics Exposed**:
 ```
+# OpenAPI Validation
 api_fence.<api_name>.cache.hits
 api_fence.<api_name>.cache.misses
 api_fence.<api_name>.schema.compile_time_ms
 api_fence.<api_name>.request.validation_errors
 api_fence.<api_name>.response.validation_errors
+
+# ModSecurity WAF
+api_fence.<api_name>.modsec.request.scans
+api_fence.<api_name>.modsec.request.blocked
+api_fence.<api_name>.modsec.request.alerts
+api_fence.<api_name>.modsec.request.timeouts
+api_fence.<api_name>.modsec.request.scan_time_ms
+api_fence.<api_name>.modsec.response.scans
+api_fence.<api_name>.modsec.response.blocked
+api_fence.<api_name>.modsec.response.alerts
+api_fence.<api_name>.modsec.response.timeouts
+api_fence.<api_name>.modsec.response.scan_time_ms
 ```
 
 **Dynamic Metadata** (for access logs):
 ```
+# OpenAPI Validation
 api_fence:request.verdict   -> "valid" | "invalid"
 api_fence:request.error_count
 api_fence:request.errors    -> pipe-separated error list
 api_fence:response.verdict
 api_fence:response.error_count
 api_fence:response.errors
+
+# ModSecurity WAF
+api_fence:modsec.request.verdict          -> "blocked" | "allowed" | "alert"
+api_fence:modsec.request.ruleset          -> Name of ruleset used
+api_fence:modsec.request.matched_rules    -> JSON array of rule IDs
+api_fence:modsec.request.matched_messages -> Pipe-separated messages
+api_fence:modsec.request.scan_time_ms     -> Scan duration
+api_fence:modsec.request.timed_out        -> Boolean timeout indicator
+api_fence:modsec.response.verdict
+api_fence:modsec.response.ruleset
+api_fence:modsec.response.matched_rules
+api_fence:modsec.response.matched_messages
+api_fence:modsec.response.scan_time_ms
+api_fence:modsec.response.timed_out
 ```
+
+### 7. ModSecurity WAF Module (`src/modsec/`)
+
+**Responsibility**: Web Application Firewall protection against common attacks.
+
+| Component | Description |
+|-----------|-------------|
+| `ModSecConfig` | WAF configuration (rulesets, action, pool size) |
+| `ModSecEngine` | Thread-safe wrapper around libmodsecurity3 |
+| `ModSecScanner` | Request/response scanning logic |
+| `ModSecPool` | Thread pool for async scanning with timeout |
+| `ModSecObservability` | Metrics and metadata emission |
+| `bundled_crs` | Embedded OWASP CoreRuleSet v4.0.0 files |
+
+**Attack Detection**:
+- **SQL Injection (SQLi)**: Detect and block SQL injection attempts
+- **Cross-Site Scripting (XSS)**: Prevent XSS attacks in requests/responses
+- **Remote Code Execution (RCE)**: Block command injection and code execution
+- **Local/Remote File Inclusion (LFI/RFI)**: Detect path traversal attacks
+- **Protocol Attacks**: HTTP protocol violations and anomalies
+- **Scanner/Bot Detection**: Identify and block automated scanners
+
+**Ruleset Profiles** (OWASP CRS):
+1. **Full**: Complete protection (all CRS rules)
+2. **Request-only**: Only request scanning (no response rules)
+3. **Minimal**: Essential protection only (critical severity)
+
+**Configuration Options**:
+- **Dual Ruleset Support**: Run two rulesets simultaneously for safe migration
+- **Block vs Alert Mode**: Block malicious requests or log alerts only
+- **Async Scanning**: Non-blocking scan with configurable timeout (default: 100ms)
+- **Fail-Open/Fail-Closed**: Behavior on timeout or scan error
+- **Custom Rules**: Inline rules, file paths, or remote URLs
+- **JSON String Extraction**: Smart extraction of strings from JSON bodies
+- **Base64 Detection**: Skip scanning base64-encoded data to reduce false positives
 
 ---
 
@@ -255,6 +339,10 @@ api_fence:response.errors
        |
        +---> Validate against request body schema
        |
+       +---> If ModSecurity WAF enabled:
+       |          Async scan request (headers + body)
+       |          If blocked: Return 403 Forbidden
+       |
        +---> If mocking enabled:
        |          Generate and return mock response
        |
@@ -266,6 +354,9 @@ api_fence:response.errors
        |
        +---> Validate response headers
        +---> Validate response body
+       +---> If ModSecurity WAF response scan enabled:
+       |          Async scan response
+       |          Log violations (no blocking)
        +---> Set metadata
        |
 7. Response to client
@@ -388,6 +479,7 @@ Request validated successfully
 | Query params | Type validation, required checks, pattern matching |
 | Headers | Required checks, format validation, enum validation |
 | Body | JSON Schema validation (properties, types, formats) |
+| **All Inputs** | **ModSecurity WAF scans for SQLi, XSS, RCE, protocol attacks** |
 
 ### 3. Denial of Service Protection
 
@@ -397,6 +489,8 @@ Request validated successfully
 | Complex regex in spec | Regex compilation at startup, not per-request |
 | Schema cache flooding | LRU eviction with max capacity |
 | Slow schema compilation | One-time compilation, cached thereafter |
+| **WAF scan timeout** | **Configurable timeout (default: 100ms), fail-open option** |
+| **WAF rule complexity** | **OWASP CRS optimized for performance, profile options** |
 
 ### 4. Information Disclosure
 
@@ -749,12 +843,13 @@ mise run quality
 
 ## Future Considerations
 
-### Planned Modules
+### Planned Enhancements
 
-1. **libmodsecurity Integration** (from vision)
-   - WAF rules evaluation
-   - Request body scanning
-   - Separate module to avoid fast-path pollution
+1. **~~libmodsecurity Integration~~** ✅ **COMPLETED**
+   - ~~WAF rules evaluation~~
+   - ~~Request body scanning~~
+   - ~~Separate module to avoid fast-path pollution~~
+   - **Status**: Fully implemented in `src/modsec/` with OWASP CRS v4.0.0
 
 2. **XML Schema / WSDL Support** (from vision)
    - SOAP API validation
@@ -768,6 +863,12 @@ mise run quality
    - Per-operation rate limits from OpenAPI `x-rate-limit`
    - Integration with Envoy rate limit service
 
+5. **Advanced WAF Features**
+   - Custom rule development and testing tools
+   - Rule performance profiling
+   - False positive tuning assistance
+   - Integration with threat intelligence feeds
+
 ### Architectural Decisions Record (ADR)
 
 | Decision | Rationale |
@@ -778,6 +879,9 @@ mise run quality
 | jsonschema crate | Full JSON Schema draft support |
 | No external runtime deps | Latency, reliability, security |
 | Fail-fast on bad config | Prevent silent failures in production |
+| **libmodsecurity3 for WAF** | **Industry-standard WAF engine, proven OWASP CRS** |
+| **Async WAF scanning** | **Non-blocking with timeout, maintains throughput** |
+| **Bundled OWASP CRS v4.0.0** | **Zero-config security, downloaded at build time** |
 
 ---
 

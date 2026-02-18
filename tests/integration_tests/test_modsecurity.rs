@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! ModSecurity WAF integration tests
 //!
 //! These tests verify that ModSecurity scanning works correctly end-to-end

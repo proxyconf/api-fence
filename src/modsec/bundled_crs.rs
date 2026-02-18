@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Bundled CoreRuleSet (CRS) rules
 //!
 //! This module provides OWASP CoreRuleSet v4.0.0 rules that are

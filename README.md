@@ -10,7 +10,6 @@ An HTTP filter for Envoy Proxy that validates requests against OpenAPI specifica
 
 # Enter development environment
 mise install
-mise trust
 
 # Build the filter
 mise run build
@@ -31,6 +30,18 @@ mise run test
   - Request body validation (JSON with schema)
   - Response header validation (required, pattern, format, etc.)
   - Response body validation (JSON with schema)
+- **ModSecurity WAF Integration**: Web Application Firewall protection using libmodsecurity3
+  - Request and response body scanning
+  - Bundled OWASP CoreRuleSet (CRS) v4.0.0 with zero-configuration setup
+  - Protection against SQLi, XSS, RCE, LFI/RFI, and protocol attacks
+  - Multiple ruleset profiles: full, request-only, or minimal (fastest)
+  - Dual ruleset support for safe migration between CRS versions
+  - Async scanning with thread pool for non-blocking operation
+  - Configurable timeout and fail-open/fail-closed behavior
+  - JSON string extraction optimization to reduce false positives
+  - Base64 detection to skip encoded data scanning
+  - Block or alert modes for matched rules
+  - Custom rules via inline, file path, or remote URL
 - **Mock Response Generation**: Generate mock responses for API testing without a backend
   - Example-based: Use examples from OpenAPI response definitions
   - Schema-based: Generate realistic fake data matching response schemas
@@ -41,23 +52,39 @@ mise run test
 - **Schema Caching**: Compiled JSON schemas are cached with configurable TTL for optimal performance
 - **Flexible Validation**: Configure request/response validation independently
 - **Error Handling**: Choose to fail requests on validation errors or pass them through with metadata
-- **Rich Metrics**: Track cache hits/misses, schema compilation time, and validation errors (scoped per API)
-- **Dynamic Metadata**: Validation results and errors are exposed as Envoy dynamic metadata for logging
-- **Production Ready**: Optimized builds with LTO and stripping
+- **Rich Metrics**: Track cache hits/misses, schema compilation time, validation errors, and WAF detections (scoped per API)
+- **Dynamic Metadata**: Validation and WAF results are exposed as Envoy dynamic metadata for logging
+- **Production Ready**: Optimized builds with LTO and stripping, static linking for portability
 
 ## Metrics
 
 The filter exposes the following metrics, scoped under your configured `api_name`:
 
+**OpenAPI Validation:**
 - `api_fence.<api_name>.cache.hits` - Number of schema cache hits
 - `api_fence.<api_name>.cache.misses` - Number of schema cache misses  
 - `api_fence.<api_name>.schema.compile_time_ms` - Histogram of schema compilation times
 - `api_fence.<api_name>.request.validation_errors` - Count of request validation errors
 - `api_fence.<api_name>.response.validation_errors` - Count of response validation errors
 
+**ModSecurity WAF (when enabled):**
+- `api_fence.<api_name>.modsec.request.scans` - Total request scans performed
+- `api_fence.<api_name>.modsec.request.blocked` - Requests blocked by WAF rules
+- `api_fence.<api_name>.modsec.request.alerts` - Requests with alerts (matched but not blocked)
+- `api_fence.<api_name>.modsec.request.timeouts` - Request scan timeouts
+- `api_fence.<api_name>.modsec.request.scan_time_ms` - Request scan duration histogram
+- `api_fence.<api_name>.modsec.response.scans` - Total response scans performed
+- `api_fence.<api_name>.modsec.response.blocked` - Responses blocked by WAF rules
+- `api_fence.<api_name>.modsec.response.alerts` - Responses with alerts
+- `api_fence.<api_name>.modsec.response.timeouts` - Response scan timeouts
+- `api_fence.<api_name>.modsec.response.scan_time_ms` - Response scan duration histogram
+- `api_fence.<api_name>.modsec.strings_extracted` - Total strings extracted from JSON
+- `api_fence.<api_name>.modsec.base64_skipped` - Base64 strings skipped to reduce false positives
+
 For example, with `api_name: "users_api"`, metrics will appear as:
 - `api_fence.users_api.cache.hits`
 - `api_fence.users_api.request.validation_errors`
+- `api_fence.users_api.modsec.request.blocked`
 
 This allows multiple filter instances to track metrics independently.
 
@@ -65,22 +92,36 @@ Access metrics at `http://localhost:9901/stats/prometheus`
 
 ## Dynamic Metadata
 
-Validation results are exposed as dynamic metadata in the `api_fence` namespace:
+Validation and WAF results are exposed as dynamic metadata in the `api_fence` namespace:
 
-**Request Validation:**
+**OpenAPI Validation:**
 - `request.verdict` - "valid" or "invalid"
 - `request.error_count` - Number of validation errors
 - `request.errors` - Pipe-separated list of error messages
-
-**Response Validation:**
 - `response.verdict` - "valid" or "invalid"
 - `response.error_count` - Number of validation errors
 - `response.errors` - Pipe-separated list of error messages
 
-Use these in access logs to track validation issues:
+**ModSecurity WAF (when enabled):**
+- `modsec.request.verdict` - "blocked", "allowed", or "alert"
+- `modsec.request.ruleset` - Name of ruleset used for enforcement
+- `modsec.request.matched_rules` - JSON array of matched rule IDs (e.g., `[942100, 941110]`)
+- `modsec.request.matched_messages` - Pipe-separated rule messages
+- `modsec.request.scan_time_ms` - Scan duration in milliseconds
+- `modsec.request.timed_out` - Boolean indicating if scan timed out
+- `modsec.response.verdict` - "blocked", "allowed", or "alert"
+- `modsec.response.ruleset` - Name of ruleset used for enforcement
+- `modsec.response.matched_rules` - JSON array of matched rule IDs
+- `modsec.response.matched_messages` - Pipe-separated rule messages
+- `modsec.response.scan_time_ms` - Scan duration in milliseconds
+- `modsec.response.timed_out` - Boolean indicating if scan timed out
+
+Use these in access logs to track validation and security issues:
 ```
 %DYNAMIC_METADATA(api_fence:request.verdict)%
 %DYNAMIC_METADATA(api_fence:request.errors)%
+%DYNAMIC_METADATA(api_fence:modsec.request.verdict)%
+%DYNAMIC_METADATA(api_fence:modsec.request.matched_messages)%
 ```
 
 ## Development
@@ -172,6 +213,31 @@ http_filters:
 
 When `fail_on_*_error` is false, validation errors are recorded in metrics and metadata but the request/response continues.
 
+**ModSecurity WAF Configuration (optional):**
+- `modsecurity.scan_request` - Enable request body scanning (default: false)
+- `modsecurity.scan_response` - Enable response body scanning (default: false)
+- `modsecurity.scan_response_as_request` - Use request scanning API for responses (default: false)
+- `modsecurity.request_action` - Action on match: "block" or "alert" (default: "block")
+- `modsecurity.response_action` - Action on match: "block" or "alert" (default: "alert")
+- `modsecurity.pool.timeout_ms` - Maximum scan timeout in milliseconds (default: 100)
+- `modsecurity.pool.timeout_action` - Action on timeout: "allow" or "block" (default: "allow")
+- `modsecurity.pool.queue_capacity` - Maximum queue depth for pending scans (default: 1000)
+
+**ModSecurity Ruleset Configuration:**
+- `modsecurity.primary_ruleset.name` - Ruleset name for metrics/metadata (required)
+- `modsecurity.primary_ruleset.use_bundled_crs` - Use bundled OWASP CRS v4.0.0 (default: false)
+- `modsecurity.primary_ruleset.bundled_crs_profile` - CRS profile: "full", "request", or "minimal" (default: "full")
+- `modsecurity.primary_ruleset.rules_path` - Paths to rule files (supports glob patterns like `/path/*.conf`)
+- `modsecurity.primary_ruleset.rules_inline` - Inline rules as a string
+- `modsecurity.primary_ruleset.rules_remote.url` - Remote URL to fetch rules from
+- `modsecurity.primary_ruleset.rules_remote.key` - Optional API key for authentication
+- `modsecurity.secondary_ruleset.*` - Optional secondary ruleset for safe migration testing
+
+The bundled CRS profiles provide zero-configuration WAF protection:
+- **full**: All essential CRS rules (request + response scanning) - comprehensive protection
+- **request**: Request-only rules (no response scanning) - faster, good for most APIs
+- **minimal**: SQLi, XSS, RCE only - fastest, protects against most critical attacks
+
 **Mocking Configuration (optional):**
 - `mocking.enabled` - Enable mock response generation (default: false)
 - `mocking.prefer_examples` - Use OpenAPI examples before schema-based generation (default: true)
@@ -190,9 +256,82 @@ See `examples/` directory:
 - `envoy-config.yaml` - Basic configuration with request validation
 - `envoy-config-advanced.yaml` - Advanced config with response validation, pass-through mode, and full access logging
 - `envoy-config-mock.yaml` - Mock response generation for API testing (no backend required)
+- `envoy-modsec-config.yaml` - ModSecurity WAF with bundled CRS rules
 - `sample-openapi.yaml` - Example OpenAPI spec with header validation
 - `header-validation-example.yaml` - Comprehensive header validation examples (required/optional, patterns, formats, enums)
 - `mock-example-openapi.yaml` - OpenAPI spec with response examples for mocking
+
+### ModSecurity WAF Configuration Example
+
+Enable WAF scanning with bundled OWASP CoreRuleSet:
+
+```yaml
+filter_config:
+  value: |
+    {
+      "api_name": "protected_api",
+      "openapi_spec_path": "./examples/sample-openapi.yaml",
+      "validation": {
+        "validate_request": true,
+        "fail_on_request_error": true
+      },
+      "modsecurity": {
+        "scan_request": true,
+        "scan_response": false,
+        "request_action": "block",
+        "response_action": "alert",
+        "pool": {
+          "timeout_ms": 100,
+          "timeout_action": "allow"
+        },
+        "primary_ruleset": {
+          "name": "crs_v4",
+          "use_bundled_crs": true,
+          "bundled_crs_profile": "request"
+        }
+      }
+    }
+```
+
+This configuration provides:
+- OpenAPI validation for request structure
+- ModSecurity WAF scanning for attack patterns (SQLi, XSS, RCE, etc.)
+- Fast request-only CRS profile
+- 100ms scan timeout with fail-open behavior
+- Block on WAF matches, continue on timeouts
+
+For custom rules or external CRS installations:
+
+```yaml
+"modsecurity": {
+  "scan_request": true,
+  "primary_ruleset": {
+    "name": "custom_rules",
+    "rules_path": [
+      "/etc/modsecurity/modsecurity.conf",
+      "/etc/modsecurity/crs/*.conf"
+    ]
+  }
+}
+```
+
+For safe migration testing with dual rulesets:
+
+```yaml
+"modsecurity": {
+  "scan_request": true,
+  "primary_ruleset": {
+    "name": "crs_v3",
+    "rules_path": ["/etc/modsecurity/crs-v3/*.conf"]
+  },
+  "secondary_ruleset": {
+    "name": "crs_v4",
+    "use_bundled_crs": true
+  }
+}
+```
+
+Both rulesets are evaluated, but if both match, the secondary (NEW) result is used for enforcement.
 
 ### Mock Response Generation Example
 
@@ -250,7 +389,21 @@ Mock responses are generated using:
 
 ## License
 
-Apache-2.0
+Mozilla Public License 2.0 (MPL-2.0)
+
+All source files include SPDX license identifiers:
+```rust
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+```
+
+## Contributing
+
+When contributing code:
+- Every Rust file (`.rs`) must include the SPDX header shown above
+- Follow the project rules in `.opencode/rules/rust.md`
+- Use templates from `.opencode/templates/` for new files
+- Run tests and linters before submitting
 
 ## Resources
 

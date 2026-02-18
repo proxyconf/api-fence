@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Error types for the OpenAPI filter
 //!
 //! This module defines structured error types for validation and configuration errors,

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Raw FFI bindings to libmodsecurity (ModSecurity v3)
 //!
 //! These bindings are manually defined to avoid the build-time complexity of bindgen.

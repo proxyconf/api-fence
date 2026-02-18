@@ -2,7 +2,10 @@
 
 ## Project Overview
 
-This project implements an HTTP filter for Envoy Proxy using Rust and the Envoy Dynamic Modules feature. The filter validates incoming HTTP requests against OpenAPI specifications.
+This project implements an HTTP filter for Envoy Proxy using Rust and the Envoy Dynamic Modules feature. The filter provides dual functionality:
+
+1. **OpenAPI Validation**: Validates incoming HTTP requests and responses against OpenAPI 3.x specifications
+2. **ModSecurity WAF**: Web Application Firewall protection with bundled OWASP CoreRuleSet v4.0.0 for defense against SQLi, XSS, RCE, and other attacks
 
 ### Technology Stack
 
@@ -70,9 +73,19 @@ mise run clippy
 ```
 api_fence/
 ├── src/
-│   └── lib.rs              # Main filter implementation
-├── tests/                  # Integration tests
+│   ├── lib.rs              # Main filter and OpenAPI validation
+│   └── modsec/             # ModSecurity WAF integration
+│       ├── mod.rs          # Public API exports
+│       ├── config.rs       # WAF configuration types
+│       ├── engine.rs       # ModSecurity engine wrapper
+│       ├── pool.rs         # Thread pool for async scanning
+│       ├── scanner.rs      # Request/response scanning logic
+│       ├── observability.rs # Metrics and metadata
+│       ├── crs.rs          # Bundled OWASP CRS
+│       └── util.rs         # Helper utilities
+├── tests/                  # Integration and WAF tests
 │   └── integration_tests/  # Test modules
+├── build.rs                # Build script (downloads OWASP CRS v4.0.0)
 ├── Cargo.toml              # Rust dependencies and build config
 ├── mise.toml               # Mise development environment
 ├── bacon.toml              # Bacon watcher config
@@ -110,6 +123,9 @@ cargo watch -x "test --test integration"
 
 - `envoy-proxy-dynamic-modules-rust-sdk`: Official Envoy Rust SDK (git dependency, must match Envoy version)
 - `serde`, `serde_json`: Configuration parsing and JSON handling
+- `modsecurity-sys`: Rust bindings to libmodsecurity3 (WAF engine)
+- `jsonschema`: JSON Schema validation for OpenAPI
+- `matchit`: Fast path routing for API endpoints
 
 ### Development Dependencies
 
@@ -152,6 +168,20 @@ http_filters:
 ```
 
 ## Code Guidelines
+
+### License Headers
+
+**CRITICAL**: Every Rust source file (`.rs`) MUST begin with:
+
+```rust
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
+```
+
+- See `.opencode/rules/rust.md` for complete requirements
+- Templates are available in `.opencode/templates/`
+- This project is licensed under **Mozilla Public License 2.0 (MPL-2.0)**
 
 ### Rust Style
 

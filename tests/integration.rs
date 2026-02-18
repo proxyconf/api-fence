@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Integration Test Suite for OpenAPI Filter
 //!
 //! Tests the OpenAPI filter running inside a real Envoy process.

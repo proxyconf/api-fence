@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! HTTP client wrapper for integration tests
 //!
 //! Provides a fluent API for making HTTP requests and asserting on responses.

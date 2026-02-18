@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Binary to export JSON Schema for API Fence configuration
 //!
 //! This binary generates a JSON Schema document from the Config struct,

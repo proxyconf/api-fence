@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Global validation thread pool singleton
 //!
 //! Provides a single shared validation pool for all API filter instances,

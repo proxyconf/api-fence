@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Validation module
 //!
 //! This module contains all validation logic for the OpenAPI filter,

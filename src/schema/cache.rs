@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Schema caching
 //!
 //! This module provides a typed wrapper around moka cache for JSON Schema validators.

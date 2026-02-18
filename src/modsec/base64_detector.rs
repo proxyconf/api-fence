@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 ProxyConf Authors
+
 //! Base64 detection heuristics
 //!
 //! This module provides heuristics to detect base64-encoded strings.
